@@ -68,6 +68,8 @@ course page to piece together what's due.
   status, so answers come back fast enough for a voice conversation.
 - **MCP server** (spec 2025-11-25, Streamable HTTP) exposes the planner as
   tools that Alexa+ can call. **[TODO]**
+- **Agent Skill** (open `SKILL.md` standard) teaches the agent how to
+  prioritize homework and how to answer briefly for voice. **[TODO]**
 - **Simulated Alexa+ web app**: you speak a question, an agent built with the
   **Strands Agents SDK** on **Amazon Bedrock** calls the MCP server, and the
   answer is spoken back. **[TODO]**

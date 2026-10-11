@@ -33,6 +33,7 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 **Alexa+ integration**
 
 - [ ] **MCP server** (spec 2025-11-25, Streamable HTTP) exposing the planner as tools Alexa+ can call
+- [ ] **Agent Skill** (open `SKILL.md` standard): teaches the agent how to prioritize and how to answer briefly for voice
 - [ ] **Simulated Alexa+ web app**: speak a question, an agent calls the MCP server, and the answer is spoken back
 
 **AWS**
