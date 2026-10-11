@@ -28,7 +28,7 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 - [x] "What should I work on?": prioritize by due date, points, and time available
 - [x] "Plan my week": spread assignments across the week
 - [x] Add study sessions to Google Calendar
-- [ ] Proactive reminders for work due soon that isn't submitted
+- [x] Proactive reminders for work due soon that isn't submitted
 
 **Alexa+ integration**
 
@@ -103,6 +103,14 @@ OAuth client (Desktop app) with the Calendar API enabled, saved as
 ```
 python -m homework_helper.study_sessions          # preview
 python -m homework_helper.study_sessions --sync   # add to calendar
+```
+
+Check for reminders: work due tomorrow, due within 3 hours, or overdue and
+not submitted. Each reminder is said only once (add `--all` to see every
+reminder that applies):
+
+```
+python -m homework_helper.reminders
 ```
 
 Run the tests with `pytest`.

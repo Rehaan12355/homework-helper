@@ -53,8 +53,10 @@ I wanted to build what that older skill couldn't: a planner that decides.
   blocks, fitted into free time around practice, class, and other events,
   each linking back to the assignment in Canvas. Re-planning replaces the
   old sessions and never touches the student's own events. ✅ Built
-- **Reminders**: warns you about work due soon that you haven't submitted.
-  **[TODO]**
+- **Proactive reminders**: speaks up about work that isn't submitted the day
+  before it's due, again a few hours before, and once if it goes overdue.
+  It never repeats a reminder, and starts over if a teacher moves the due
+  date. ✅ Built
 - **Understands real Canvas data**: reads assignments, quizzes, and
   discussions across all courses, knows what you've already submitted, and
   handles homework from publisher sites like Pearson. ✅ Built
