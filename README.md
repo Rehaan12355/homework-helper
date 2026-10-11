@@ -27,7 +27,7 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 - [x] Read courses and assignments from Canvas, including what's submitted
 - [x] "What should I work on?": prioritize by due date, points, and time available
 - [x] "Plan my week": spread assignments across the week
-- [ ] Add study sessions to Google Calendar
+- [x] Add study sessions to Google Calendar
 - [ ] Proactive reminders for work due soon that isn't submitted
 
 **Alexa+ integration**
