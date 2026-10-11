@@ -32,7 +32,7 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 
 **Alexa+ integration**
 
-- [ ] **MCP server** (spec 2025-11-25, Streamable HTTP) exposing the planner as tools Alexa+ can call
+- [x] **MCP server** (spec 2025-11-25, Streamable HTTP) exposing the planner as tools Alexa+ can call
 - [ ] **Agent Skill** (open `SKILL.md` standard): teaches the agent how to prioritize and how to answer briefly for voice
 - [ ] **Simulated Alexa+ web app**: speak a question, an agent calls the MCP server, and the answer is spoken back
 
@@ -112,6 +112,31 @@ reminder that applies):
 ```
 python -m homework_helper.reminders
 ```
+
+### MCP server
+
+Start the MCP server (Streamable HTTP at `http://127.0.0.1:8000/mcp`):
+
+```
+python -m homework_helper.mcp_server
+```
+
+It speaks MCP spec 2025-11-25 and newer, and offers these tools. Each one
+returns `say`, a short answer ready to be spoken, plus the details behind it:
+
+| Tool | What it does |
+|---|---|
+| `what_should_i_work_on` | Best work to do now; pass `minutes_free` to fill that time |
+| `plan_my_week` | Spreads homework across the next 7 days |
+| `list_assignments` | All unfinished work, most important first |
+| `check_reminders` | Work due within a day, within 3 hours, or overdue |
+| `add_study_sessions` | Puts the week plan on Google Calendar |
+
+To try it in a browser, run `npx @modelcontextprotocol/inspector`, choose
+**Streamable HTTP**, and connect to `http://127.0.0.1:8000/mcp`.
+
+The server only listens on your own computer for now. It has no sign-in
+yet, so don't expose it to the internet until the AWS step adds one.
 
 Run the tests with `pytest`.
 

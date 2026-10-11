@@ -3,4 +3,5 @@ python-dotenv>=1.0
 tzdata>=2024.1
 google-api-python-client>=2.100
 google-auth-oauthlib>=1.2
+mcp>=2.3
 pytest>=8.0

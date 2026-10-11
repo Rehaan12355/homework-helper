@@ -72,8 +72,13 @@ course page to piece together what's due.
 - **Canvas planner API** fetches everything due across all courses in a
   single request (assignments, quizzes, discussions), including submission
   status, so answers come back fast enough for a voice conversation.
-- **MCP server** (spec 2025-11-25, Streamable HTTP) exposes the planner as
-  tools that Alexa+ can call. **[TODO]**
+- **MCP server** (official MCP Python SDK, Streamable HTTP, spec 2025-11-25
+  and newer) exposes five tools Alexa+ can call: what to work on, plan my
+  week, upcoming assignments, reminders, and add study sessions to the
+  calendar. Every tool returns a ready-to-speak `say` answer plus structured
+  details, so the agent can read the answer as-is and still handle
+  follow-ups like "when is that due?". Read-only tools are marked read-only,
+  so an agent knows only the calendar tool changes anything. ✅ Built
 - **Agent Skill** (open `SKILL.md` standard) teaches the agent how to
   prioritize homework and how to answer briefly for voice. **[TODO]**
 - **Simulated Alexa+ web app**: you speak a question, an agent built with the
