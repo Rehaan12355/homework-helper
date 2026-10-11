@@ -46,7 +46,7 @@ I wanted to build what that older skill couldn't: a planner that decides.
 **[DRAFT]** Homework Helper is a voice-first study planner for students.
 
 - **"What should I work on?"**: picks the best assignment for the time you
-  have, weighing due dates, points, and anything overdue. **[TODO]**
+  have, weighing due dates, points, and anything overdue. ✅ Built
 - **"Plan my week"**: spreads your assignments across the week and can add
   study sessions to Google Calendar. **[TODO]**
 - **Reminders**: warns you about work due soon that you haven't submitted.
@@ -91,6 +91,13 @@ other, and counts the homework done if either copy is.
 **Canvas doesn't know about outside homework.** Canvas only marks work
 "missing" if it's submitted inside Canvas, so overdue Pearson homework was
 never flagged. Homework Helper checks the due date itself.
+
+**Overdue work crowded out everything else.** My first version gave overdue
+work double priority. On my real assignments, that meant a 5-point item five
+days late beat a 30-point quiz due in three days, and two free hours went
+entirely to old work. Overdue work is now scored like something due right
+now, and fades the longer it's late (it's more likely closed, penalized, or
+already done on Pearson). Work past its Canvas lock date is never suggested.
 
 **[TODO]** _Add challenges from the MCP server, Bedrock, and AWS work. Copy
 the best entries from FRICTION_LOG.md._

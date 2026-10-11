@@ -33,6 +33,7 @@ class Assignment:
     submitted: bool
     missing: bool             # past due and not submitted, per Canvas
     graded: bool
+    locks: datetime | None = None   # after this, Canvas won't accept it
 
     @property
     def done(self) -> bool:
@@ -43,6 +44,10 @@ class Assignment:
         # Canvas only sets "missing" for work submitted in Canvas itself, not
         # for homework on outside sites (like Pearson), so check the date too.
         return not self.done and self.due < datetime.now(timezone.utc)
+
+    @property
+    def locked(self) -> bool:
+        return self.locks is not None and self.locks < datetime.now(timezone.utc)
 
 
 class Canvas:
@@ -117,6 +122,7 @@ class Canvas:
             submitted=bool(subs.get("submitted") or subs.get("excused")) or marked_done,
             missing=bool(subs.get("missing")),
             graded=bool(subs.get("graded")),
+            locks=parse_time(plannable["lock_at"]) if plannable.get("lock_at") else None,
         )
 
 
