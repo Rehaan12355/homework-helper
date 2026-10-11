@@ -33,7 +33,7 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 **Alexa+ integration**
 
 - [x] **MCP server** (spec 2025-11-25, Streamable HTTP) exposing the planner as tools Alexa+ can call
-- [ ] **Agent Skill** (open `SKILL.md` standard): teaches the agent how to prioritize and how to answer briefly for voice
+- [x] **Agent Skill** (open `SKILL.md` standard): teaches the agent how to prioritize and how to answer briefly for voice
 - [ ] **Simulated Alexa+ web app**: speak a question, an agent calls the MCP server, and the answer is spoken back
 
 **AWS**
@@ -137,6 +137,20 @@ To try it in a browser, run `npx @modelcontextprotocol/inspector`, choose
 
 The server only listens on your own computer for now. It has no sign-in
 yet, so don't expose it to the internet until the AWS step adds one.
+
+### Agent Skill
+
+[`skills/homework-helper/SKILL.md`](skills/homework-helper/SKILL.md)
+follows the open [Agent Skills](https://agentskills.io) standard. It teaches
+an agent which MCP tool fits each question, how to keep answers short enough
+to listen to, how to handle overdue work Canvas can't see (like Pearson), and
+to only change the calendar when asked. Any agent that supports Agent Skills
+can load the folder; `homework_helper/skill.py` loads it for the simulated
+Alexa+ agent. Check it against the standard with:
+
+```
+agentskills validate skills/homework-helper
+```
 
 Run the tests with `pytest`.
 

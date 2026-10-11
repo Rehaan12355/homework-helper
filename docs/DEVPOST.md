@@ -79,8 +79,12 @@ course page to piece together what's due.
   details, so the agent can read the answer as-is and still handle
   follow-ups like "when is that due?". Read-only tools are marked read-only,
   so an agent knows only the calendar tool changes anything. ✅ Built
-- **Agent Skill** (open `SKILL.md` standard) teaches the agent how to
-  prioritize homework and how to answer briefly for voice. **[TODO]**
+- **Agent Skill** (open `SKILL.md` standard) teaches the agent which tool
+  fits each question, how to keep answers to about two sentences for
+  listening, how to handle overdue work that may already be done on Pearson,
+  and to change the calendar only when asked. It passes the standard's
+  reference validator, and a test fails if the skill and the MCP server's
+  tools ever drift apart. ✅ Built
 - **Simulated Alexa+ web app**: you speak a question, an agent built with the
   **Strands Agents SDK** on **Amazon Bedrock** calls the MCP server, and the
   answer is spoken back. **[TODO]**
