@@ -26,7 +26,7 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 
 - [x] Read courses and assignments from Canvas, including what's submitted
 - [x] "What should I work on?": prioritize by due date, points, and time available
-- [ ] "Plan my week": spread assignments across the week
+- [x] "Plan my week": spread assignments across the week
 - [ ] Add study sessions to Google Calendar
 - [ ] Proactive reminders for work due soon that isn't submitted
 
@@ -85,6 +85,12 @@ Ask what to work on with 2 hours free:
 
 ```
 python -m homework_helper.planner 120
+```
+
+Plan your week (optionally pass minutes per day, default 120):
+
+```
+python -m homework_helper.week
 ```
 
 Run the tests with `pytest`.

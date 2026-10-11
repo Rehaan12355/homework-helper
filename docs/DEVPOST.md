@@ -47,8 +47,9 @@ I wanted to build what that older skill couldn't: a planner that decides.
 
 - **"What should I work on?"**: picks the best assignment for the time you
   have, weighing due dates, points, and anything overdue. ✅ Built
-- **"Plan my week"**: spreads your assignments across the week and can add
-  study sessions to Google Calendar. **[TODO]**
+- **"Plan my week"**: spreads your assignments across the week, each on a
+  day before it's due, within a daily study-time budget. ✅ Built. Adding
+  study sessions to Google Calendar: **[TODO]**
 - **Reminders**: warns you about work due soon that you haven't submitted.
   **[TODO]**
 - **Understands real Canvas data**: reads assignments, quizzes, and

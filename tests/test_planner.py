@@ -97,3 +97,10 @@ def test_spoken_due_dates():
 def test_reason_mentions_points_and_overdue():
     [pick] = ranked([work("Quiz 2", -30, points=30)], NOW)
     assert "30 points" in pick.reason and "doesn't show it submitted" in pick.reason
+
+
+def test_stale_work_with_many_points_is_not_suggested():
+    # A 50-point item a month overdue must not fill free time.
+    picks = what_to_work_on([work("Old project", -24 * 30, points=50),
+                             work("CH 03 HW", 30)], minutes_free=120, now=NOW)
+    assert [p.assignment.title for p in picks] == ["CH 03 HW"]
