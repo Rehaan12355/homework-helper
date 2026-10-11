@@ -4,6 +4,9 @@ config.json
 credentials.json
 token.json
 
+# Local notes
+rules.txt
+
 # Python
 .venv/
 __pycache__/

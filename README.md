@@ -11,8 +11,8 @@ behind, all hands-free.
 > "Start your Chapter 4 homework. It's worth 20 points and due Thursday.
 > Save the STEM Fluency assignment for the weekend."
 
-Built for the **Build, Ship, Shape: Amazon Developer Hackathon 2026**
-(Alexa+ track).
+Built for the **Amazon Developer Hackathon 2026**: Alexa+ track, plus the
+AWS Builder mini challenge.
 
 ## Why
 
@@ -29,23 +29,43 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 - [ ] "Plan my week": spread assignments across the week
 - [ ] Add study sessions to Google Calendar
 - [ ] Proactive reminders for work due soon that isn't submitted
-- [ ] Alexa+ integration (MCP server) and voice demo
 
-**Running on AWS**
+**Alexa+ integration**
 
-- [ ] **AWS Lambda**: runs the code in the cloud whenever Alexa+ asks a question
+- [ ] **MCP server** (spec 2025-11-25, Streamable HTTP) exposing the planner as tools Alexa+ can call
+- [ ] **Simulated Alexa+ web app**: speak a question, an agent calls the MCP server, and the answer is spoken back
+
+**AWS**
+
+- [ ] **Amazon Bedrock**: the AI model behind the simulated Alexa+ agent, and estimates of how long each assignment will take
+- [ ] **Strands Agents SDK**: connects the Bedrock agent to the MCP server
+- [ ] **AWS Lambda**: hosts the MCP server in the cloud
 - [ ] **Amazon EventBridge Scheduler**: checks Canvas every morning and evening to trigger reminders
 - [ ] **Amazon DynamoDB**: stores the week plan, settings, and which reminders were already sent
-- [ ] _Stretch:_ **Amazon Bedrock**: estimates how long each assignment will take from its description
+
+**Submission** (due October 23, 2026, 12:00 PM PT)
+
+- [ ] Demo video under 3 minutes (public on YouTube, in English)
+- [ ] Project description on Devpost
+- [ ] Product feedback for every tool used, including which AWS services and how
+- [ ] Friction log (up to a 10% judging bonus)
 
 ## Architecture
 
 ```
-Alexa+ ──▶ AWS Lambda (Homework Helper) ──▶ Canvas API
-                 │        ▲                  Google Calendar API
-                 ▼        │
-           DynamoDB   EventBridge Scheduler (reminders)
+Simulated Alexa+ (web app, voice)
+        │
+        ▼
+Strands agent on Amazon Bedrock ──MCP (Streamable HTTP)──▶ Homework Helper MCP server (AWS Lambda)
+                                                                 │        │        ▲
+                                                                 ▼        ▼        │
+                                                          Canvas API  DynamoDB  EventBridge Scheduler
+                                                          Google Calendar API      (reminders)
 ```
+
+## License
+
+MIT
 
 ## Setup
 
