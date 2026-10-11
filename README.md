@@ -24,7 +24,7 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 
 **Core features** (built and tested locally first)
 
-- [ ] Read courses and assignments from Canvas, including what's submitted
+- [x] Read courses and assignments from Canvas, including what's submitted
 - [ ] "What should I work on?": prioritize by due date, points, and time available
 - [ ] "Plan my week": spread assignments across the week
 - [ ] Add study sessions to Google Calendar
@@ -63,10 +63,25 @@ Strands agent on Amazon Bedrock ──MCP (Streamable HTTP)──▶ Homework He
                                                           Google Calendar API      (reminders)
 ```
 
+## Setup
+
+```
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+```
+
+Fill in `.env` with your Canvas address and an access token
+(Canvas → Account → Settings → **+ New Access Token**), then check it can
+read your work:
+
+```
+python -m homework_helper.canvas
+```
+
+Run the tests with `pytest`.
+
 ## License
 
 MIT
-
-## Setup
-
-_Coming soon._
