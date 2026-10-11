@@ -3,6 +3,9 @@ python-dotenv>=1.0
 tzdata>=2024.1
 google-api-python-client>=2.100
 google-auth-oauthlib>=1.2
-mcp>=2.3
+mcp>=2.1
 skills-ref>=0.1
+strands-agents>=1.59
+botocore[crt]
+uvicorn
 pytest>=8.0

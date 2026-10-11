@@ -34,7 +34,7 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 
 - [x] **MCP server** (spec 2025-11-25, Streamable HTTP) exposing the planner as tools Alexa+ can call
 - [x] **Agent Skill** (open `SKILL.md` standard): teaches the agent how to prioritize and how to answer briefly for voice
-- [ ] **Simulated Alexa+ web app**: speak a question, an agent calls the MCP server, and the answer is spoken back
+- [ ] **Simulated Alexa+ web app**: speak a question, an agent calls the MCP server, and the answer is spoken back (built and tested; waiting on Bedrock access for a live run)
 
 **AWS**
 
@@ -151,6 +151,25 @@ Alexa+ agent. Check it against the standard with:
 ```
 agentskills validate skills/homework-helper
 ```
+
+### Simulated Alexa+
+
+A web page that works like an Echo: tap the light ring (or press Space),
+ask a question out loud, and hear the answer. Behind it, an agent built with
+the **Strands Agents SDK** on **Amazon Bedrock** (Amazon Nova 2 Lite) follows
+the Agent Skill and answers by calling the MCP server over Streamable HTTP.
+New reminders turn the ring yellow, like an Alexa notification; ask "what
+are my notifications?" to hear them.
+
+Sign in to AWS first (`aws login`), then:
+
+```
+python -m homework_helper.alexa_app          # open http://127.0.0.1:8000
+python -m homework_helper.alexa_app --demo   # reminders start fresh each run
+```
+
+Voice input needs Chrome or Edge; you can also type. Set `BEDROCK_MODEL_ID`
+in `.env` to use a different model.
 
 Run the tests with `pytest`.
 

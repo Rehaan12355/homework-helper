@@ -85,9 +85,13 @@ course page to piece together what's due.
   and to change the calendar only when asked. It passes the standard's
   reference validator, and a test fails if the skill and the MCP server's
   tools ever drift apart. ✅ Built
-- **Simulated Alexa+ web app**: you speak a question, an agent built with the
-  **Strands Agents SDK** on **Amazon Bedrock** calls the MCP server, and the
-  answer is spoken back. **[TODO]**
+- **Simulated Alexa+ web app**: an Echo-style light ring in the browser. You
+  speak a question, an agent built with the **Strands Agents SDK** on
+  **Amazon Bedrock** (Amazon Nova 2 Lite) follows the Agent Skill and calls
+  the MCP server over Streamable HTTP, and the answer is spoken back. New
+  reminders turn the ring yellow, like a real Alexa notification. If
+  something fails, it says what's wrong out loud instead of going silent.
+  **[TODO: confirm live run once Bedrock access opens]**
 - **AWS:** Lambda hosts the MCP server, EventBridge Scheduler triggers
   reminders, and DynamoDB stores plans and reminder history. **[TODO]**
 - Python, with automated tests (pytest) for the Canvas logic.
