@@ -1,6 +1,8 @@
-# Alexa Study Planner
+# Homework Helper
 
-An Alexa+ study planner for students. Instead of just reading out due dates,
+**Hands-free homework planner and reminder with Alexa+**
+
+A study planner for students. Instead of just reading out due dates,
 it decides what to work on, plans the week, and reminds you before you fall
 behind, all hands-free.
 
