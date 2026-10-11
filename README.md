@@ -93,6 +93,18 @@ Plan your week (optionally pass minutes per day, default 120):
 python -m homework_helper.week
 ```
 
+Put the plan on Google Calendar as study sessions. They're placed in free
+time between `STUDY_START` (default 4 PM) and 11 PM, around your existing
+events. Running it again replaces the old sessions instead of duplicating
+them, and your own events are never changed. You'll need a Google Cloud
+OAuth client (Desktop app) with the Calendar API enabled, saved as
+`credentials.json`. The first run opens a browser to sign in.
+
+```
+python -m homework_helper.study_sessions          # preview
+python -m homework_helper.study_sessions --sync   # add to calendar
+```
+
 Run the tests with `pytest`.
 
 ## License
