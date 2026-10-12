@@ -15,3 +15,6 @@ __pycache__/
 
 # Local app data
 reminders_sent.json
+
+# Lambda build output
+build/

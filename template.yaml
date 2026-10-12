@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Homework Helper: the MCP server on AWS Lambda, reminder checks on Amazon
+  EventBridge Scheduler, and state in Amazon DynamoDB.
+  Deploy with: python deploy/deploy.py  (see README)
+
+Parameters:
+  CanvasUrl:
+    Type: String
+    Description: Your Canvas address, e.g. https://myschool.instructure.com
+  CanvasToken:
+    Type: String
+    NoEcho: true
+  McpApiKey:
+    Type: String
+    NoEcho: true
+    MinLength: 20
+    Description: Bearer token every MCP request must send
+  StudentTimezone:
+    Type: String
+    Default: America/Los_Angeles
+  StudyStart:
+    Type: String
+    Default: "16:00"
+  GoogleTokenJson:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Contents of token.json, so the server can add study sessions (optional)
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures: [x86_64]
+    CodeUri: build/lambda.zip    # made by deploy/deploy.py
+    MemorySize: 512
+    Environment:
+      Variables:
+        CANVAS_URL: !Ref CanvasUrl
+        CANVAS_TOKEN: !Ref CanvasToken
+        STUDENT_TIMEZONE: !Ref StudentTimezone
+        STUDY_START: !Ref StudyStart
+        HOMEWORK_TABLE: !Ref HomeworkTable
+
+Resources:
+  HomeworkTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+      TimeToLiveSpecification:
+        AttributeName: expires
+        Enabled: true
+
+  McpServerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Homework Helper MCP server (Streamable HTTP)
+      Handler: run.sh
+      Timeout: 60
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:25
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_PORT: "8080"
+          MCP_API_KEY: !Ref McpApiKey
+          GOOGLE_TOKEN_JSON: !Ref GoogleTokenJson
+      FunctionUrlConfig:
+        AuthType: NONE        # the MCP_API_KEY bearer token guards it
+        InvokeMode: BUFFERED
+
+  ReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Checks Canvas and queues new homework reminders
+      Handler: homework_helper.cloud.reminder_handler
+      Timeout: 60
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref HomeworkTable }
+      Events:
+        Morning:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(0 7 * * ? *)
+            ScheduleExpressionTimezone: !Ref StudentTimezone
+        Evening:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(0 19 * * ? *)
+            ScheduleExpressionTimezone: !Ref StudentTimezone
+
+Outputs:
+  McpUrl:
+    Description: Set MCP_URL to this, and MCP_API_KEY to your key
+    Value: !Sub "${McpServerFunctionUrl.FunctionUrl}mcp"
+  HomeworkTableName:
+    Description: Set HOMEWORK_TABLE to this so the Alexa+ app reads cloud reminders
+    Value: !Ref HomeworkTable

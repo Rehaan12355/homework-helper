@@ -40,9 +40,9 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 
 - [ ] **Amazon Bedrock**: the AI model behind the simulated Alexa+ agent, and estimates of how long each assignment will take
 - [ ] **Strands Agents SDK**: connects the Bedrock agent to the MCP server
-- [ ] **AWS Lambda**: hosts the MCP server in the cloud
-- [ ] **Amazon EventBridge Scheduler**: checks Canvas every morning and evening to trigger reminders
-- [ ] **Amazon DynamoDB**: stores the week plan, settings, and which reminders were already sent
+- [ ] **AWS Lambda**: hosts the MCP server in the cloud, behind a Function URL with an API key (built and tested locally; not deployed yet)
+- [ ] **Amazon EventBridge Scheduler**: checks Canvas every morning and evening to trigger reminders (in `template.yaml`; not deployed yet)
+- [ ] **Amazon DynamoDB**: stores which reminders were sent and which are waiting to be heard (built and tested; not deployed yet)
 
 **Submission** (due October 23, 2026, 12:00 PM PT)
 
@@ -135,8 +135,8 @@ returns `say`, a short answer ready to be spoken, plus the details behind it:
 To try it in a browser, run `npx @modelcontextprotocol/inspector`, choose
 **Streamable HTTP**, and connect to `http://127.0.0.1:8000/mcp`.
 
-The server only listens on your own computer for now. It has no sign-in
-yet, so don't expose it to the internet until the AWS step adds one.
+This local server only listens on your own computer and has no sign-in.
+The cloud version (below) requires an API key.
 
 ### Agent Skill
 
@@ -170,6 +170,33 @@ python -m homework_helper.alexa_app --demo   # reminders start fresh each run
 
 Voice input needs Chrome or Edge; you can also type. Set `BEDROCK_MODEL_ID`
 in `.env` to use a different model.
+
+### Deploy to AWS
+
+`template.yaml` (AWS SAM) sets up:
+
+- **AWS Lambda** running the MCP server through the
+  [AWS Lambda Web Adapter](https://github.com/awslabs/aws-lambda-web-adapter),
+  reachable at a Lambda Function URL. Every request must send
+  `Authorization: Bearer <MCP_API_KEY>`.
+- **Amazon EventBridge Scheduler** running a reminder check at 7 AM and 7 PM
+  in the student's time zone.
+- **Amazon DynamoDB** remembering which reminders were sent, and queuing new
+  ones until they're heard (old records expire on their own).
+
+You only need the AWS CLI and [uv](https://docs.astral.sh/uv/) (`pip install uv`),
+not the SAM CLI. Sign in (`aws login`), then:
+
+```
+python deploy/deploy.py
+```
+
+It builds the Lambda package, deploys the stack, and prints `MCP_URL` and
+`HOMEWORK_TABLE`. Your Canvas settings, time zone and Google sign-in
+(`token.json`, so the cloud can add study sessions) come from `.env`. If
+`.env` has no `MCP_API_KEY`, one is made and saved there. Add the two
+printed values to `.env`, and the simulated Alexa+ app will use the cloud
+MCP server and hear the reminders the scheduler found.
 
 Run the tests with `pytest`.
 

@@ -36,6 +36,7 @@ PORT = int(os.environ.get("MCP_PORT", "8000"))
 # The agent reaches the MCP server over HTTP. By default that's the one this
 # app serves at /mcp; point MCP_URL at the cloud server once it's deployed.
 MCP_URL = os.environ.get("MCP_URL", f"http://{HOST}:{PORT}/mcp")
+MCP_API_KEY = os.environ.get("MCP_API_KEY")     # needed by the cloud server
 MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "us.amazon.nova-2-lite-v1:0")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 PAGE = Path(__file__).resolve().parent.parent / "web" / "alexa.html"
@@ -53,7 +54,15 @@ def build_agent():
     from strands.models import BedrockModel
     from strands.tools.mcp import MCPClient
 
-    homework_tools = MCPClient(lambda: streamable_http_client(MCP_URL))
+    def connect():
+        if not MCP_API_KEY:
+            return streamable_http_client(MCP_URL)
+        import httpx2
+        client = httpx2.AsyncClient(headers={"Authorization": f"Bearer {MCP_API_KEY}"},
+                                    timeout=httpx2.Timeout(30, read=300))
+        return streamable_http_client(MCP_URL, http_client=client)
+
+    homework_tools = MCPClient(connect)
     model = BedrockModel(model_id=MODEL_ID, region_name=REGION,
                          temperature=0.3, max_tokens=400,
                          boto_client_config=Config(retries={"max_attempts": 2},
@@ -67,12 +76,17 @@ def build_agent():
 
 
 class Assistant:
-    """One conversation at a time, like a single Alexa device."""
+    """One conversation at a time, like a single Alexa device.
 
-    def __init__(self, reminder_log: reminders.SentLog):
+    Reminders come from one of two places: checked here against Canvas
+    (on a laptop), or read from the DynamoDB inbox that the scheduled
+    reminder Lambda fills (when deployed, pass `inbox`)."""
+
+    def __init__(self, reminder_log: reminders.SentLog | None = None, inbox=None):
         self.agent = None
         self.lock = threading.Lock()
         self.reminder_log = reminder_log
+        self.inbox = inbox
         self.notifications: list[str] = []
 
     def ask(self, text: str) -> str:
@@ -87,12 +101,16 @@ class Assistant:
 
     def check_reminders(self) -> int:
         """Adds any new reminders to the notification queue."""
+        if self.inbox is not None:
+            return len(self.notifications) + self.inbox.count()
         new = reminders.check(mcp_server.load_work(), self.reminder_log)
         self.notifications += [r.text for r in new]
         return len(self.notifications)
 
     def read_notifications(self) -> list[str]:
         unread, self.notifications = self.notifications, []
+        if self.inbox is not None:
+            unread += self.inbox.take()
         return unread
 
 
@@ -152,10 +170,15 @@ def create_app(assistant: Assistant):
 
 
 if __name__ == "__main__":
-    if "--demo" in sys.argv:
-        log_path = os.path.join(tempfile.mkdtemp(), "reminders_sent.json")
+    if os.environ.get("HOMEWORK_TABLE"):          # reminders from the cloud
+        from homework_helper import store
+        assistant = Assistant(inbox=store.Inbox(store.table()))
     else:
-        log_path = None
-    app = create_app(Assistant(reminders.SentLog(log_path)))
+        if "--demo" in sys.argv:
+            log_path = os.path.join(tempfile.mkdtemp(), "reminders_sent.json")
+        else:
+            log_path = None
+        assistant = Assistant(reminders.SentLog(log_path))
+    app = create_app(assistant)
     print(f"Simulated Alexa+ running at http://{HOST}:{PORT}  (model: {MODEL_ID})")
     uvicorn.run(app, host=HOST, port=PORT, log_level="warning")

@@ -1,0 +1,8 @@
+# What the Lambda functions need. boto3 is already in the Lambda runtime.
+requests>=2.31
+python-dotenv>=1.0
+tzdata>=2024.1
+google-api-python-client>=2.100
+google-auth-oauthlib>=1.2
+mcp==2.1.1          # same version as tested locally
+uvicorn
