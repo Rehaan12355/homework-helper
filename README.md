@@ -40,9 +40,9 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 
 - [ ] **Amazon Bedrock**: the AI model behind the simulated Alexa+ agent, and estimates of how long each assignment will take
 - [ ] **Strands Agents SDK**: connects the Bedrock agent to the MCP server
-- [ ] **AWS Lambda**: hosts the MCP server in the cloud, behind a Function URL with an API key (built and tested locally; not deployed yet)
-- [ ] **Amazon EventBridge Scheduler**: checks Canvas every morning and evening to trigger reminders (in `template.yaml`; not deployed yet)
-- [ ] **Amazon DynamoDB**: stores which reminders were sent and which are waiting to be heard (built and tested; not deployed yet)
+- [x] **AWS Lambda**: hosts the MCP server in the cloud, behind a Function URL with an API key
+- [x] **Amazon EventBridge Scheduler**: checks Canvas every morning and evening to trigger reminders
+- [x] **Amazon DynamoDB**: stores which reminders were sent and which are waiting to be heard
 
 **Submission** (due October 23, 2026, 12:00 PM PT)
 

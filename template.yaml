@@ -33,7 +33,6 @@ Globals:
   Function:
     Runtime: python3.13
     Architectures: [x86_64]
-    CodeUri: build/lambda.zip    # made by deploy/deploy.py
     MemorySize: 512
     Environment:
       Variables:
@@ -62,10 +61,11 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Description: Homework Helper MCP server (Streamable HTTP)
+      CodeUri: build/lambda.zip    # made by deploy/deploy.py; `aws cloudformation package` ignores CodeUri in Globals
       Handler: run.sh
       Timeout: 60
       Layers:
-        - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:25
+        - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:30
       Environment:
         Variables:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
@@ -80,6 +80,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Description: Checks Canvas and queues new homework reminders
+      CodeUri: build/lambda.zip    # made by deploy/deploy.py; `aws cloudformation package` ignores CodeUri in Globals
       Handler: homework_helper.cloud.reminder_handler
       Timeout: 60
       Policies:
