@@ -18,7 +18,7 @@ import json
 import os
 from datetime import datetime, timezone
 
-from homework_helper import mcp_server, reminders, store
+from homework_helper import mcp_server, names, reminders, store
 from homework_helper.canvas import Canvas
 
 
@@ -67,7 +67,8 @@ def reminder_handler(event=None, context=None, tbl=None) -> dict:
     """Checks Canvas for new reminders and adds them to the inbox."""
     tbl = tbl or store.table()
     now = datetime.now(timezone.utc)
-    new = reminders.check(Canvas.from_env().assignments(), store.DynamoSentLog(tbl), now)
+    work = names.add_names(Canvas.from_env().assignments(), store.DynamoNames(tbl))
+    new = reminders.check(work, store.DynamoSentLog(tbl), now)
     store.Inbox(tbl).add([(r.key, r.text) for r in new], now)
     print(f"{len(new)} new reminder(s)")
     return {"new_reminders": len(new)}

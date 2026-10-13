@@ -44,7 +44,7 @@ def test_reminder_wording():
     ], NOW)
     assert soon.text == "Heads up: Pre-lab is due in about 3 hours and isn't submitted yet."
     assert day.text == ("Reminder: CH 03 HW is due tomorrow at 9:00 AM and isn't "
-                        "submitted yet. It takes about an hour.")
+                        "submitted yet.")
     assert late.text.startswith("Quiz 2 was due 2 days ago")
 
 

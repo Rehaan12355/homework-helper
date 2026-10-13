@@ -47,8 +47,17 @@ I wanted to build what that older skill couldn't: a planner that decides.
 
 - **"What should I work on?"**: picks the best assignment for the time you
   have, weighing due dates, points, and anything overdue. ✅ Built
-- **"Plan my week"**: spreads your assignments across the week, each on a
-  day before it's due, within a daily study-time budget. ✅ Built
+- **"Plan my week"**: a timed study schedule for the week. Every
+  assignment lands on a day before it's due, within a daily study-time
+  budget. Quizzes get study time the day before, exams get two sessions,
+  and long lab reports are split across days. It fits around the student's
+  Google Calendar, and the full schedule appears on screen. ✅ Built
+- **"I finished Quiz 2"**: marks work done in Canvas by voice, so it drops
+  off the list and reminders. If it's unclear which assignment you mean, it
+  asks. ✅ Built
+- **Sounds like a person**: Amazon Bedrock turns long Canvas titles into
+  what a student would say ("STEM Fluency 3", "the free fall pre-lab"), and
+  it only mentions how long things take when you ask. ✅ Built
 - **Study sessions on Google Calendar**: turns the week plan into time
   blocks, fitted into free time around practice, class, and other events,
   each linking back to the assignment in Canvas. Re-planning replaces the
@@ -73,12 +82,12 @@ course page to piece together what's due.
   single request (assignments, quizzes, discussions), including submission
   status, so answers come back fast enough for a voice conversation.
 - **MCP server** (official MCP Python SDK, Streamable HTTP, spec 2025-11-25
-  and newer) exposes five tools Alexa+ can call: what to work on, plan my
-  week, upcoming assignments, reminders, and add study sessions to the
+  and newer) exposes six tools Alexa+ can call: what to work on, plan my
+  week, upcoming assignments, reminders, mark work done, and add study sessions to the
   calendar. Every tool returns a ready-to-speak `say` answer plus structured
   details, so the agent can read the answer as-is and still handle
   follow-ups like "when is that due?". Read-only tools are marked read-only,
-  so an agent knows only the calendar tool changes anything. ✅ Built
+  so an agent knows only the calendar and mark-done tools change anything. ✅ Built
 - **Agent Skill** (open `SKILL.md` standard) teaches the agent which tool
   fits each question, how to keep answers to about two sentences for
   listening, how to handle overdue work that may already be done on Pearson,
@@ -91,7 +100,7 @@ course page to piece together what's due.
   the MCP server over Streamable HTTP, and the answer is spoken back. New
   reminders turn the ring yellow, like a real Alexa notification. If
   something fails, it says what's wrong out loud instead of going silent.
-  **[TODO: confirm live run once Bedrock access opens]**
+  It runs against the MCP server deployed on Lambda. ✅ Built
 - **AWS:** Lambda hosts the MCP server, EventBridge Scheduler triggers
   reminders, and DynamoDB stores plans and reminder history. **[TODO]**
 - Python, with automated tests (pytest) for the Canvas logic.
@@ -137,8 +146,6 @@ correctly; the planner explaining its choice._
 ## What's next for Homework Helper
 
 **[DRAFT]**
-- **"Alexa, I finished Quiz 2"**: let students mark work done by voice, for
-  publisher homework Canvas can't see.
 - Connect to real Alexa+ when MCP integrations open beyond the preview program.
 - Support for other learning platforms (Google Classroom, Schoology).
 - Learn how long you actually take on each type of assignment to plan better.

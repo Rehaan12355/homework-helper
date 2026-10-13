@@ -13,7 +13,7 @@ from datetime import datetime, time, timedelta, timezone
 
 from homework_helper.clock import local_tz, to_local
 from homework_helper.planner import Pick
-from homework_helper.week import BEDTIME, Day
+from homework_helper.week import BEDTIME, Day, study_start
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 TAG = "homeworkHelper"                 # marks events this app created
@@ -26,12 +26,6 @@ class Session:
     pick: Pick
     start: datetime
     end: datetime
-
-
-def study_start() -> time:
-    """When study time begins each day, from STUDY_START (e.g. "16:00")."""
-    hours, minutes = os.environ.get("STUDY_START", "16:00").split(":")
-    return time(int(hours), int(minutes))
 
 
 def round_up(dt: datetime) -> datetime:
@@ -115,7 +109,8 @@ def event_body(s: Session) -> dict:
             body["timeZone"] = tz.key
         return body
     return {
-        "summary": f"Study: {a.title}",
+        "summary": s.pick.label(full=True) if s.pick.task == "study" or s.pick.parts > 1
+                   else f"Study: {a.title}",
         "description": f"{a.course}\n{s.pick.reason}\n{a.url}".strip(),
         "start": when(s.start),
         "end": when(s.end),
@@ -153,6 +148,27 @@ def google_calendar():
     return build("calendar", "v3", credentials=creds, cache_discovery=False)
 
 
+def saved_calendar():
+    """Google Calendar from a saved sign-in, or None. Never opens a browser,
+    so it's safe inside a server."""
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+
+    token_file = os.environ.get("GOOGLE_TOKEN", "token.json")
+    if not os.path.exists(token_file):
+        return None
+    try:
+        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+        if not creds.valid:
+            if not (creds.expired and creds.refresh_token):
+                return None
+            creds.refresh(Request())
+        return build("calendar", "v3", credentials=creds, cache_discovery=False)
+    except Exception:
+        return None
+
+
 def list_events(service, start: datetime, end: datetime, calendar_id: str = "primary",
                 **filters) -> list[dict]:
     events, page = [], None
@@ -164,6 +180,23 @@ def list_events(service, start: datetime, end: datetime, calendar_id: str = "pri
         page = result.get("nextPageToken")
         if not page:
             return events
+
+
+def preview(week: list[Day], now: datetime | None = None,
+            calendar_id: str = "primary") -> tuple[list[Session], list[Pick], bool]:
+    """Times for the week plan without changing anything. Fits around the
+    student's calendar when it can be read. Returns the sessions, the work
+    that didn't fit, and whether the calendar was used."""
+    now = now or datetime.now(timezone.utc)
+    end = datetime.combine(week[-1].date + timedelta(days=1), time(0), to_local(now).tzinfo)
+    busy, used = [], False
+    service = saved_calendar()
+    if service is not None:
+        try:
+            busy, used = busy_times(list_events(service, now, end, calendar_id), now), True
+        except Exception:
+            pass                    # plan without the calendar instead
+    return *schedule(week, busy, now), used
 
 
 def sync(service, week: list[Day], now: datetime | None = None,

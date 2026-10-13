@@ -39,6 +39,22 @@ class Pick:
     minutes: int
     score: float
     reason: str
+    # In a week plan, one assignment can become several sessions: time to
+    # study before a quiz, or a long lab report split across days.
+    task: str = "do"          # "study" (prepare for it) or "do" (work on it)
+    part: int = 1
+    parts: int = 1
+
+    def label(self, full: bool = False) -> str:
+        """What this session is, e.g. "Study for Quiz 2" or "Motion Lab
+        write-up, part 1 of 2". `full` uses the Canvas title."""
+        a = self.assignment
+        name = a.title if full else a.name
+        if self.task == "study":
+            return f"Study for {name}"
+        if self.parts > 1:
+            return f"{name}, part {self.part} of {self.parts}"
+        return name
 
 
 def estimate_minutes(a: Assignment) -> int:

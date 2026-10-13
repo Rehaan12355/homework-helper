@@ -26,8 +26,21 @@ def fake_canvas(monkeypatch):
     monkeypatch.setattr(mcp_server, "now", lambda: NOW)
     homework = [work("Quiz 2", NOW - timedelta(days=2), points=30),
                 work("CH 03 HW", NOW + timedelta(hours=20)),
-                work("Chapter 04 pre-lecture", NOW + timedelta(days=3))]
+                work("Chapter 04 pre-lecture", NOW + timedelta(days=3)),
+                work("STEM Fluency Assignment 3", NOW + timedelta(days=5)),
+                work("STEM Fluency Assignment 4", NOW + timedelta(days=6))]
+    homework[1].name = "Chapter 3 homework"
     monkeypatch.setattr(mcp_server, "load_work", lambda: homework)
+    return homework
+
+
+class FakeCanvas:
+    def __init__(self):
+        self.marked = []
+
+    def mark_done(self, a, done=True):
+        a.marked_done = done
+        self.marked.append((a.title, done))
 
 
 def call(tool, args=None):
@@ -45,7 +58,7 @@ def test_lists_the_homework_tools():
             return {t.name for t in (await client.list_tools()).tools}
     assert asyncio.run(go()) == {"what_should_i_work_on", "plan_my_week",
                                  "list_assignments", "check_reminders",
-                                 "add_study_sessions"}
+                                 "add_study_sessions", "mark_complete"}
 
 
 def test_what_should_i_work_on():
@@ -62,19 +75,28 @@ def test_what_fits_in_an_hour():
 
 def test_plan_my_week():
     result = call("plan_my_week")
-    assert result["say"].startswith("Today: Quiz 2")
+    assert result["say"] == ("Start today at 4 PM with Quiz 2. Today: Study for Quiz 2, "
+                             "Quiz 2 and Chapter 3 homework. After that, 3 more sessions "
+                             "through Tuesday. Some days run over your usual study time.")
+    assert result["whole_week"].startswith("Today: Study for Quiz 2")
     assert len(result["days"]) == 7
+    [study, quiz, homework] = result["days"][0]["sessions"]
+    assert study["label"] == "Study for Quiz 2" and study["task"] == "study"
+    assert study["start"].endswith("T16:00:00-07:00") and quiz["start"] > study["end"]
+    assert result["fits_your_calendar"] is False
 
 
 def test_check_reminders():
     result = call("check_reminders")
-    assert "CH 03 HW is due tomorrow" in result["say"]
+    assert "Chapter 3 homework is due tomorrow" in result["say"]
     assert "Quiz 2 was due 2 days ago" in result["say"]
 
 
 def test_list_assignments():
     result = call("list_assignments")
-    assert result["say"].startswith("You have 3 unfinished assignments.")
+    assert result["say"].startswith("You have 5 unfinished assignments.")
+    assert result["assignments"][1]["name"] == "Chapter 3 homework"
+    assert result["assignments"][1]["title"] == "CH 03 HW"
 
 
 def test_add_study_sessions(monkeypatch):
@@ -83,5 +105,38 @@ def test_add_study_sessions(monkeypatch):
     calendar = FakeCalendar([])
     monkeypatch.setattr(study_sessions, "google_calendar", lambda: calendar)
     result = call("add_study_sessions")
-    assert result["say"].startswith("I added 3 study sessions to your calendar.")
-    assert len(calendar.events_by_id) == 3
+    assert result["say"].startswith("I added 6 study sessions to your calendar. "
+                                    "The first is Study for Quiz 2 at 4:00 PM.")
+    assert len(calendar.events_by_id) == 6
+
+
+def test_mark_complete(monkeypatch):
+    canvas = FakeCanvas()
+    monkeypatch.setattr(mcp_server, "canvas", lambda: canvas)
+    result = call("mark_complete", {"assignment": "chapter three homework"})
+    assert canvas.marked == [("CH 03 HW", True)]
+    assert result["say"] == ("Done, I marked Chapter 3 homework as done in Canvas. "
+                             "Next up is Quiz 2.")
+
+
+def test_mark_complete_asks_when_unsure(monkeypatch):
+    canvas = FakeCanvas()
+    monkeypatch.setattr(mcp_server, "canvas", lambda: canvas)
+    result = call("mark_complete", {"assignment": "stem fluency"})
+    assert canvas.marked == []
+    assert result["say"] == "Which one: STEM Fluency Assignment 3 or STEM Fluency Assignment 4?"
+
+
+def test_mark_complete_can_undo(monkeypatch, fake_canvas):
+    canvas = FakeCanvas()
+    monkeypatch.setattr(mcp_server, "canvas", lambda: canvas)
+    fake_canvas[0].marked_done = True
+    result = call("mark_complete", {"assignment": "quiz 2", "done": False})
+    assert canvas.marked == [("Quiz 2", False)]
+    assert result["say"] == "Okay, Quiz 2 is back on your list."
+
+
+def test_mark_complete_not_found(monkeypatch):
+    monkeypatch.setattr(mcp_server, "canvas", lambda: pytest.fail("shouldn't change Canvas"))
+    result = call("mark_complete", {"assignment": "history essay"})
+    assert result["say"] == "I couldn't find an assignment called history essay."

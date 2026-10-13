@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from homework_helper.canvas import Assignment
-from homework_helper.week import last_work_day, plan_week, spoken_summary
+from homework_helper.week import last_work_day, plan_week, sessions_for, spoken_summary
 
 TZ = ZoneInfo("America/Los_Angeles")
 # Saturday Oct 10, 2026 at 2:00 PM local time.
@@ -31,8 +31,14 @@ def day_of(week, title):
     return next(d.date for d in week for p in d.picks if p.assignment.title == title)
 
 
-def test_morning_deadlines_must_be_done_the_day_before():
+def sessions(week, title):
+    """(date, label) of each session for one assignment, in plan order."""
+    return [(d.date, p.label()) for d in week for p in d.picks if p.assignment.title == title]
+
+
+def test_deadlines_before_study_time_must_be_done_the_day_before():
     assert last_work_day(work("Lab", local(12, 10, 30))) == date(2026, 10, 11)
+    assert last_work_day(work("Mini-lab", local(12, 12, 30))) == date(2026, 10, 11)
     assert last_work_day(work("HW", local(12, 23, 59))) == date(2026, 10, 12)
 
 
@@ -85,5 +91,43 @@ def test_spoken_summary_names_days():
     week = plan_week([work("Quiz 2", local(8, 12)),
                       work("CH 03 HW", local(12, 23, 59))], NOW)
     summary = spoken_summary(week)
-    assert summary.startswith("Today: Quiz 2")
-    assert "CH 03 HW" in summary and "minutes" in summary
+    assert summary.startswith("Today: Study for Quiz 2 and Quiz 2.")
+    assert "CH 03 HW" in summary and "minutes" not in summary
+
+
+def test_quizzes_get_study_time_the_day_before():
+    # Quiz due Tuesday night: study Monday, take it Monday or Tuesday.
+    week = plan_week([work("Quiz 2: MCQ", local(13, 23, 59), points=30)], NOW)
+    (study_day, study), (quiz_day, quiz) = sessions(week, "Quiz 2: MCQ")
+    assert (study_day, study) == (date(2026, 10, 12), "Study for Quiz 2: MCQ")
+    assert quiz == "Quiz 2: MCQ" and study_day <= quiz_day <= date(2026, 10, 13)
+
+
+def test_exams_get_two_study_sessions_on_different_days():
+    week = plan_week([work("Midterm exam", local(15, 9), points=100)], NOW)
+    found = sessions(week, "Midterm exam")
+    assert [label for _, label in found] == [
+        "Study for Midterm exam", "Study for Midterm exam", "Midterm exam"]
+    assert found[0][0] < found[1][0] < date(2026, 10, 15)
+
+
+def test_pretests_and_pre_lectures_are_not_studied_for():
+    a = work("Tutorial 2 pretest - Acceleration", local(13, 23, 59))
+    from homework_helper.planner import ranked
+    assert [p.task for p in sessions_for(ranked([a], NOW)[0])] == ["do"]
+
+
+def test_long_work_is_split_across_days():
+    week = plan_week([work("Motion Lab write-up", local(15, 23, 59))], NOW)
+    found = sessions(week, "Motion Lab write-up")
+    assert [label for _, label in found] == [
+        "Motion Lab write-up, part 1 of 2", "Motion Lab write-up, part 2 of 2"]
+    assert found[0][0] < found[1][0]
+    assert all(p.minutes == 45 for d in week for p in d.picks)
+
+
+def test_parts_on_the_same_day_are_said_once():
+    # Overdue, so both parts have to be today.
+    week = plan_week([work("Motion Lab write-up", local(10, 10, 30))], NOW)
+    assert len(week[0].picks) == 2
+    assert spoken_summary(week) == "Today: Motion Lab write-up."

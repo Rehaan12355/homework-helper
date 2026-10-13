@@ -23,6 +23,10 @@ Parameters:
   StudyStart:
     Type: String
     Default: "16:00"
+  BedrockModelId:
+    Type: String
+    Default: us.amazon.nova-2-lite-v1:0
+    Description: Model that writes short spoken names for assignments
   GoogleTokenJson:
     Type: String
     NoEcho: true
@@ -41,8 +45,28 @@ Globals:
         STUDENT_TIMEZONE: !Ref StudentTimezone
         STUDY_START: !Ref StudyStart
         HOMEWORK_TABLE: !Ref HomeworkTable
+        BEDROCK_MODEL_ID: !Ref BedrockModelId
 
 Resources:
+  # Both functions keep data in the table and ask Bedrock for short spoken
+  # assignment names. The model is a cross-region inference profile, so it
+  # may run in any US region.
+  AppPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem,
+                     dynamodb:Query, dynamodb:BatchWriteItem]
+            Resource: !GetAtt HomeworkTable.Arn
+          - Effect: Allow
+            Action: bedrock:InvokeModel
+            Resource:
+              - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModelId}
+              - arn:aws:bedrock:*::foundation-model/*
+
   HomeworkTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -72,6 +96,8 @@ Resources:
           AWS_LWA_PORT: "8080"
           MCP_API_KEY: !Ref McpApiKey
           GOOGLE_TOKEN_JSON: !Ref GoogleTokenJson
+      Policies:
+        - !Ref AppPolicy
       FunctionUrlConfig:
         AuthType: NONE        # the MCP_API_KEY bearer token guards it
         InvokeMode: BUFFERED
@@ -84,7 +110,7 @@ Resources:
       Handler: homework_helper.cloud.reminder_handler
       Timeout: 60
       Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref HomeworkTable }
+        - !Ref AppPolicy
       Events:
         Morning:
           Type: ScheduleV2

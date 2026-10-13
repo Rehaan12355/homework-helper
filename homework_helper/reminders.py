@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from homework_helper.canvas import Assignment
-from homework_helper.planner import estimate_minutes, is_stale, when
+from homework_helper.planner import is_stale, when
 
 DAY_BEFORE = timedelta(hours=24)
 HOURS_BEFORE = timedelta(hours=3)
@@ -57,14 +57,13 @@ def stage(a: Assignment, now: datetime) -> str | None:
 def reminder_text(a: Assignment, stage: str, now: datetime) -> str:
     due = when(a.due, now)
     if stage == "overdue":
-        return (f"{a.title} was due {due}, and Canvas doesn't show it submitted. "
+        return (f"{a.name} was due {due}, and Canvas doesn't show it submitted. "
                 "It may still be worth turning in.")
     if stage == "soon":
         hours = (a.due - now).total_seconds() / 3600
         left = "under an hour" if hours < 1 else f"about {round(hours)} hours"
-        return f"Heads up: {a.title} is due in {left} and isn't submitted yet."
-    return (f"Reminder: {a.title} is due {due} and isn't submitted yet. "
-            f"It takes {spoken_minutes(estimate_minutes(a))}.")
+        return f"Heads up: {a.name} is due in {left} and isn't submitted yet."
+    return f"Reminder: {a.name} is due {due} and isn't submitted yet."
 
 
 def due_reminders(work: list[Assignment], now: datetime | None = None) -> list[Reminder]:

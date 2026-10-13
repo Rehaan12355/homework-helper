@@ -15,6 +15,7 @@ __pycache__/
 
 # Local app data
 reminders_sent.json
+spoken_names.json
 
 # Lambda build output
 build/

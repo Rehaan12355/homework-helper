@@ -12,6 +12,7 @@ Run it:  python -m homework_helper.alexa_app        then open http://127.0.0.1:8
          python -m homework_helper.alexa_app --demo  (reminders start fresh each run)
 """
 
+import json
 import os
 import sys
 import tempfile
@@ -43,11 +44,32 @@ PAGE = Path(__file__).resolve().parent.parent / "web" / "alexa.html"
 
 VOICE_RULES = (
     "\n\nYou are speaking through a simulated Alexa+ device. Reply in plain "
-    "spoken sentences only: no markdown, lists, emoji, or URLs."
+    "spoken sentences only: no markdown, lists, emoji, or URLs. This device "
+    "has a screen: week plans and assignment lists also appear on it in full, "
+    "so speak a short overview and say the details are on screen."
 )
 
+# Tool results shown on screen, and the kind of card each becomes.
+CARDS = {"plan_my_week": "schedule", "list_assignments": "assignments",
+         "what_should_i_work_on": "picks"}
 
-def build_agent():
+
+def tool_data(result: dict) -> dict | None:
+    """The structured data from an MCP tool result."""
+    if isinstance(result.get("structuredContent"), dict):
+        return result["structuredContent"]
+    for block in result.get("content", []):
+        try:
+            data = json.loads(block.get("text", ""))
+        except (TypeError, ValueError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return None
+
+
+def build_agent(on_tool=None):
+    """The Bedrock agent. `on_tool(name, data)` hears each tool result."""
     from botocore.config import Config
     from mcp.client.streamable_http import streamable_http_client
     from strands import Agent, ModelRetryStrategy
@@ -70,9 +92,18 @@ def build_agent():
     # A voice assistant shouldn't go quiet for minutes retrying: one quick
     # retry, then explain the problem out loud.
     retry = ModelRetryStrategy(max_attempts=2, initial_delay=1, max_delay=2)
-    return Agent(model=model, tools=[homework_tools],
-                 system_prompt=load_skill() + VOICE_RULES,
-                 retry_strategy=retry, callback_handler=None)
+    agent = Agent(model=model, tools=[homework_tools],
+                  system_prompt=load_skill() + VOICE_RULES,
+                  retry_strategy=retry, callback_handler=None)
+    if on_tool:
+        from strands.hooks import AfterToolCallEvent
+
+        def heard(event):
+            data = tool_data(event.result or {})
+            if data is not None:
+                on_tool(event.tool_use["name"], data)
+        agent.hooks.add_callback(AfterToolCallEvent, heard)
+    return agent
 
 
 class Assistant:
@@ -88,12 +119,19 @@ class Assistant:
         self.reminder_log = reminder_log
         self.inbox = inbox
         self.notifications: list[str] = []
+        self.card: dict | None = None
 
-    def ask(self, text: str) -> str:
+    def ask(self, text: str) -> tuple[str, dict | None]:
+        """The spoken reply, and a card to show on screen (or None)."""
         with self.lock:
+            self.card = None
             if self.agent is None:
-                self.agent = build_agent()
-            return str(self.agent(text)).strip()
+                self.agent = build_agent(self.saw_tool)
+            return str(self.agent(text)).strip(), self.card
+
+    def saw_tool(self, name: str, data: dict) -> None:
+        if name in CARDS:
+            self.card = {"type": CARDS[name], **data}
 
     def reset(self) -> None:
         with self.lock:
@@ -140,11 +178,11 @@ def create_app(assistant: Assistant):
         if not text:
             return JSONResponse({"reply": "I didn't catch that."})
         try:
-            reply = await run_in_threadpool(assistant.ask, text)
+            reply, card = await run_in_threadpool(assistant.ask, text)
         except Exception as err:          # shown in the terminal, spoken simply
             print(f"Agent error: {err!r}", file=sys.stderr)
             return JSONResponse({"reply": friendly_error(err), "error": True})
-        return JSONResponse({"reply": reply})
+        return JSONResponse({"reply": reply, "card": card} if card else {"reply": reply})
 
     async def reset(request: Request):
         assistant.reset()

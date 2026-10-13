@@ -6,8 +6,10 @@ One table holds two kinds of item, told apart by the partition key:
                                          the local reminders_sent.json)
   pk="notification"  sk=<time>#<key>     reminders waiting to be heard, like
                                          unread Alexa notifications
+  pk="name"          sk=<Canvas title>   short spoken name for that title
 
-Items carry an `expires` time, so DynamoDB's TTL cleans up old records.
+Sent reminders and notifications carry an `expires` time, so DynamoDB's TTL
+cleans up old records. Names are kept.
 """
 
 import os
@@ -40,6 +42,33 @@ class DynamoSentLog:
                                       "expires": _expires(now)})
 
 
+class DynamoNames:
+    """Same job as names.FileNames, kept in DynamoDB."""
+
+    def __init__(self, tbl):
+        self.table = tbl
+
+    def load(self) -> dict[str, str]:
+        return {item["sk"]: item["name"] for item in _query(self.table, "name")}
+
+    def save(self, new: dict[str, str]) -> None:
+        with self.table.batch_writer() as batch:
+            for title, name in new.items():
+                batch.put_item(Item={"pk": "name", "sk": title, "name": name})
+
+
+def _query(tbl, pk: str) -> list[dict]:
+    """Every item under one partition key, following DynamoDB's pages."""
+    from boto3.dynamodb.conditions import Key
+    items, start = [], {}
+    while True:
+        page = tbl.query(KeyConditionExpression=Key("pk").eq(pk), **start)
+        items += page["Items"]
+        if "LastEvaluatedKey" not in page:
+            return items
+        start = {"ExclusiveStartKey": page["LastEvaluatedKey"]}
+
+
 class Inbox:
     """Reminders waiting to be heard, oldest first."""
 
@@ -53,14 +82,7 @@ class Inbox:
                                       "text": text, "expires": _expires(now)})
 
     def _unread(self) -> list[dict]:
-        from boto3.dynamodb.conditions import Key
-        items, start = [], {}
-        while True:
-            page = self.table.query(KeyConditionExpression=Key("pk").eq("notification"), **start)
-            items += page["Items"]
-            if "LastEvaluatedKey" not in page:
-                return items
-            start = {"ExclusiveStartKey": page["LastEvaluatedKey"]}
+        return _query(self.table, "notification")
 
     def count(self) -> int:
         return len(self._unread())

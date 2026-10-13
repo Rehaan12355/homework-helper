@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from homework_helper import reminders, study_sessions
+from homework_helper import names, reminders, study_sessions
 from homework_helper.canvas import Assignment, Canvas
 from homework_helper.clock import to_local
 from homework_helper.planner import Pick, ranked, what_to_work_on, when
@@ -37,9 +37,15 @@ server = MCPServer(
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
 
 
+def canvas() -> Canvas:
+    """The student's Canvas account. Replaced in tests."""
+    return Canvas.from_env()
+
+
 def load_work() -> list[Assignment]:
-    """The student's assignments from Canvas. Replaced in tests."""
-    return Canvas.from_env().assignments()
+    """The student's assignments from Canvas, with short spoken names.
+    Replaced in tests."""
+    return names.add_names(canvas().assignments())
 
 
 def now() -> datetime:
@@ -48,13 +54,13 @@ def now() -> datetime:
 
 def pick_details(p: Pick) -> dict:
     a = p.assignment
-    return {"title": a.title, "course": a.course, "minutes": p.minutes,
+    return {"name": a.name, "title": a.title, "course": a.course, "minutes": p.minutes,
             "due": to_local(a.due).isoformat(), "points": a.points,
             "overdue": a.overdue, "why": p.reason, "url": a.url}
 
 
-def listed(items: list[str]) -> str:
-    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+def listed(items: list[str], last: str = "and") -> str:
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} {last} {items[-1]}"
 
 
 @server.tool(title="What should I work on?", annotations=READ_ONLY)
@@ -68,27 +74,75 @@ def what_should_i_work_on(minutes_free: int | None = None) -> dict[str, Any]:
         return {"say": "You're all caught up. Nothing is due right now.", "picks": []}
     if minutes_free is None or len(picks) == 1:
         top = picks[0]
-        say = f"Work on {top.assignment.title}. {top.reason}"
+        say = f"Work on {top.assignment.name}. {top.reason}"
     else:
-        total = sum(p.minutes for p in picks)
         free = spoken_minutes(minutes_free).removeprefix("about ")
         say = (f"With {free} free, you can do "
-               f"{listed([p.assignment.title for p in picks])}, "
-               f"{spoken_minutes(total)} total. Start with "
-               f"{picks[0].assignment.title}. {picks[0].reason}")
+               f"{listed([p.assignment.name for p in picks])}. Start with "
+               f"{picks[0].assignment.name}. {picks[0].reason}")
     return {"say": say, "picks": [pick_details(p) for p in picks]}
+
+
+def day_name(d, today) -> str:
+    return ("Today" if d == today else "Tomorrow" if (d - today).days == 1
+            else f"{d:%A}")
+
+
+def clock_time(dt: datetime) -> str:
+    """4:00 PM -> "4 PM", 4:30 PM -> "4:30 PM"."""
+    local = to_local(dt)
+    return local.strftime("%I:%M %p" if local.minute else "%I %p").lstrip("0")
+
+
+def session_details(s: study_sessions.Session) -> dict:
+    a = s.pick.assignment
+    return {"start": to_local(s.start).isoformat(), "end": to_local(s.end).isoformat(),
+            "label": s.pick.label(), "task": s.pick.task, "part": s.pick.part,
+            "parts": s.pick.parts, "name": a.name, "title": a.title, "course": a.course,
+            "due": to_local(a.due).isoformat(), "overdue": a.overdue, "url": a.url}
 
 
 @server.tool(title="Plan my week", annotations=READ_ONLY)
 def plan_my_week(minutes_per_day: int = DAILY_MINUTES) -> dict[str, Any]:
-    """Spreads the student's homework across the next 7 days, each
-    assignment on a day before it's due, within a daily study-time budget."""
-    week = plan_week(load_work(), now(), daily_minutes=minutes_per_day)
+    """A study schedule for the next 7 days, with times. Every assignment
+    is placed on a day before it's due, within a daily study-time budget,
+    with study time before quizzes and tests, and long work split across
+    days. Fits around the student's Google Calendar when it's connected.
+    Doesn't change the calendar; add_study_sessions does that."""
+    t = now()
+    week = plan_week(load_work(), t, daily_minutes=minutes_per_day)
+    sessions, unplaced, used_calendar = study_sessions.preview(week, t)
+    today = to_local(t).date()
+
+    # Spoken: where to start and the first day. The whole week is in
+    # `whole_week` (and on screen, on a device that has one).
+    whole_week = spoken_summary(week)
+    if sessions:
+        first = sessions[0]
+        start_day = to_local(first.start).date()
+        say = (f"Start {day_name(start_day, today).lower()} at {clock_time(first.start)} "
+               f"with {first.pick.assignment.name}. ") + spoken_summary(
+                   [d for d in week if d.date == start_day], warn=False)
+        later = [s for s in sessions if to_local(s.start).date() > start_day]
+        if later:
+            last = day_name(to_local(later[-1].start).date(), today)
+            say += (f" After that, {len(later)} more session{'s' if len(later) != 1 else ''}"
+                    f" through {last}.")
+        if any(d.over_budget for d in week):
+            say += " Some days run over your usual study time."
+    else:
+        say = whole_week
+    if unplaced:
+        say += f" I couldn't find time for {listed([p.label() for p in unplaced])}."
     return {
-        "say": spoken_summary(week),
-        "days": [{"date": d.date.isoformat(), "planned_minutes": d.planned,
-                  "budget_minutes": d.budget, "over_budget": d.over_budget,
-                  "work": [pick_details(p) for p in d.picks]} for d in week],
+        "say": say,
+        "whole_week": whole_week,
+        "fits_your_calendar": used_calendar,
+        "days": [{"date": d.date.isoformat(), "day": day_name(d.date, today),
+                  "over_budget": d.over_budget,
+                  "sessions": [session_details(s) for s in sessions
+                               if to_local(s.start).date() == d.date]} for d in week],
+        "no_time_for": [p.label() for p in unplaced],
     }
 
 
@@ -101,7 +155,7 @@ def list_assignments() -> dict[str, Any]:
         return {"say": "You have no unfinished assignments.", "assignments": []}
     first = picks[:3]
     say = (f"You have {len(picks)} unfinished assignment{'s' if len(picks) != 1 else ''}. "
-           + " ".join(f"{p.assignment.title}, due {when(p.assignment.due, t)}." for p in first))
+           + " ".join(f"{p.assignment.name}, due {when(p.assignment.due, t)}." for p in first))
     return {"say": say, "assignments": [pick_details(p) for p in picks]}
 
 
@@ -113,7 +167,7 @@ def check_reminders() -> dict[str, Any]:
     if not found:
         return {"say": "Nothing is due in the next day.", "reminders": []}
     return {"say": " ".join(r.text for r in found),
-            "reminders": [{"stage": r.stage, "title": r.assignment.title,
+            "reminders": [{"stage": r.stage, "name": r.assignment.name,
                            "text": r.text} for r in found]}
 
 
@@ -132,13 +186,42 @@ def add_study_sessions(minutes_per_day: int = DAILY_MINUTES) -> dict[str, Any]:
     if sessions:
         first = sessions[0]
         start = to_local(first.start).strftime("%I:%M %p").lstrip("0")
-        say += f" The first is {first.pick.assignment.title} at {start}."
+        say += f" The first is {first.pick.label()} at {start}."
     if unplaced:
-        say += f" I couldn't find free time for {listed([p.assignment.title for p in unplaced])}."
+        say += f" I couldn't find free time for {listed([p.label() for p in unplaced])}."
     return {"say": say,
-            "sessions": [{"title": s.pick.assignment.title, "start": to_local(s.start).isoformat(),
+            "sessions": [{"label": s.pick.label(), "start": to_local(s.start).isoformat(),
                           "end": to_local(s.end).isoformat()} for s in sessions],
-            "no_time_for": [p.assignment.title for p in unplaced]}
+            "no_time_for": [p.label() for p in unplaced]}
+
+
+@server.tool(title="Mark an assignment done",
+             annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                                         idempotentHint=True, openWorldHint=True))
+def mark_complete(assignment: str, done: bool = True) -> dict[str, Any]:
+    """Marks an assignment done in Canvas (the "mark as done" checkbox in the
+    Canvas planner and To Do list; it doesn't submit anything). Use when the
+    student says they finished something or asks to mark it done. Pass the
+    assignment as they said it, e.g. "free fall pre-lab". Pass done=false to
+    undo. If several assignments match, nothing changes and `matches` lists
+    them so you can ask which one."""
+    work = load_work()
+    found = names.find(work, assignment, done)
+    if not found:
+        return {"say": f"I couldn't find an assignment called {assignment}.",
+                "matches": [], "marked": None}
+    if len(found) > 1:
+        return {"say": f"Which one: {listed([a.name for a in found], 'or')}?",
+                "matches": [a.name for a in found], "marked": None}
+    a = found[0]
+    canvas().mark_done(a, done)
+    if not done:
+        return {"say": f"Okay, {a.name} is back on your list.", "matches": [], "marked": a.name}
+    say = f"Done, I marked {a.name} as done in Canvas."
+    picks = what_to_work_on(work, None, now())
+    if picks:
+        say += f" Next up is {picks[0].assignment.name}."
+    return {"say": say, "matches": [], "marked": a.name}
 
 
 if __name__ == "__main__":

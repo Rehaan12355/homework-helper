@@ -33,11 +33,17 @@ class Assignment:
     submitted: bool
     missing: bool             # past due and not submitted, per Canvas
     graded: bool
+    marked_done: bool = False   # the student ticked "mark as done" in Canvas
     locks: datetime | None = None   # after this, Canvas won't accept it
+    name: str = ""            # short name for speaking, set by names.add_names
+    override_id: int | None = None  # the student's "mark as done" setting in Canvas
+
+    def __post_init__(self):
+        self.name = self.name or self.title
 
     @property
     def done(self) -> bool:
-        return self.submitted or self.graded
+        return self.submitted or self.graded or self.marked_done
 
     @property
     def overdue(self) -> bool:
@@ -62,6 +68,32 @@ class Canvas:
         if not url or not token:
             raise CanvasError("Set CANVAS_URL and CANVAS_TOKEN (see .env.example).")
         return cls(url, token)
+
+    def _send(self, method: str, path: str, data: dict) -> dict:
+        try:
+            resp = self.session.request(method, f"{self.base_url}/api/v1{path}",
+                                        json=data, timeout=20)
+        except requests.RequestException as err:
+            raise CanvasError(f"Couldn't reach Canvas: {err}") from err
+        if resp.status_code == 401:
+            raise CanvasError("Canvas rejected the access token. It may have expired.")
+        if not resp.ok:
+            raise CanvasError(f"Canvas returned an error ({resp.status_code}).")
+        return resp.json()
+
+    def mark_done(self, a: Assignment, done: bool = True) -> None:
+        """Ticks (or unticks) "mark as done" for the assignment in the Canvas
+        planner and To Do list, the same checkbox the student can click.
+        This doesn't submit anything to the teacher."""
+        if a.override_id:
+            self._send("PUT", f"/planner/overrides/{a.override_id}",
+                       {"marked_complete": done})
+        else:
+            made = self._send("POST", "/planner/overrides",
+                              {"plannable_type": a.kind, "plannable_id": a.id,
+                               "marked_complete": done})
+            a.override_id = made.get("id")
+        a.marked_done = done
 
     def _get_all(self, path: str, params: dict) -> list[dict]:
         """GET a Canvas list endpoint, following its page links."""
@@ -104,7 +136,8 @@ class Canvas:
         # "submissions" is false for items that can't be submitted.
         subs = item.get("submissions") or {}
         # Students can tick "mark as done" in the Canvas planner themselves.
-        marked_done = bool((item.get("planner_override") or {}).get("marked_complete"))
+        override = item.get("planner_override") or {}
+        marked_done = bool(override.get("marked_complete"))
 
         url = item.get("html_url") or ""
         if url.startswith("/"):
@@ -119,10 +152,12 @@ class Canvas:
             due=parse_time(due),
             points=plannable.get("points_possible"),
             url=url,
-            submitted=bool(subs.get("submitted") or subs.get("excused")) or marked_done,
+            submitted=bool(subs.get("submitted") or subs.get("excused")),
+            marked_done=marked_done,
             missing=bool(subs.get("missing")),
             graded=bool(subs.get("graded")),
             locks=parse_time(plannable["lock_at"]) if plannable.get("lock_at") else None,
+            override_id=override.get("id"),
         )
 
 
@@ -153,6 +188,7 @@ def merge_duplicates(work: list[Assignment]) -> list[Assignment]:
         keep = a if (a.done and not twin.done) else twin
         keep.submitted = twin.submitted or a.submitted
         keep.graded = twin.graded or a.graded
+        keep.marked_done = twin.marked_done or a.marked_done
         keep.missing = keep.missing and not keep.done
         merged[merged.index(twin)] = keep
     # The kept copy's due date may differ slightly, so sort again.

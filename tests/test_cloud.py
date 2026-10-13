@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from starlette.testclient import TestClient
 
-from homework_helper import alexa_app, cloud, mcp_server, store
+from homework_helper import alexa_app, cloud, mcp_server, names, store
 from homework_helper.canvas import Assignment
 
 KEY = "a-long-test-key-0123456789"
@@ -28,6 +28,15 @@ class FakeTable:
 
     def delete_item(self, Key):
         self.items.pop((Key["pk"], Key["sk"]), None)
+
+    def batch_writer(self):
+        return self      # put_item works the same; used as a context manager
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
 
     def query(self, KeyConditionExpression):
         pk = KeyConditionExpression.get_expression()["values"][1]
@@ -83,7 +92,22 @@ def test_reminder_handler_queues_each_reminder_once(monkeypatch):
     heard = inbox.take()
     assert heard[0].startswith("Heads up: HW 1") and "HW 2" in heard[1]
     assert inbox.count() == 0
-    assert all(item["expires"] > datetime.now().timestamp() for item in table.items.values())
+    assert all(item["expires"] > datetime.now().timestamp()
+               for (pk, _), item in table.items.items() if pk != "name")
+
+
+def test_reminder_handler_keeps_spoken_names(monkeypatch):
+    work = [due_in(2, id=1)]
+
+    class FakeCanvas:
+        def assignments(self):
+            return work
+    monkeypatch.setattr(cloud.Canvas, "from_env", classmethod(lambda cls: FakeCanvas()))
+    monkeypatch.setattr(names, "ask_bedrock", lambda titles: {"HW 1": "the first homework"})
+    table = FakeTable()
+    cloud.reminder_handler(tbl=table)
+    assert store.Inbox(table).take()[0].startswith("Heads up: the first homework")
+    assert store.DynamoNames(table).load() == {"HW 1": "the first homework"}
 
 
 def test_alexa_app_reads_the_cloud_inbox(monkeypatch):

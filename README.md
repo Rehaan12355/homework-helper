@@ -26,20 +26,22 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 
 - [x] Read courses and assignments from Canvas, including what's submitted
 - [x] "What should I work on?": prioritize by due date, points, and time available
-- [x] "Plan my week": spread assignments across the week
+- [x] "Plan my week": a timed study schedule with study time before quizzes and long work split across days
 - [x] Add study sessions to Google Calendar
 - [x] Proactive reminders for work due soon that isn't submitted
+- [x] "I finished Quiz 2": mark work done in Canvas by voice
+- [x] Short spoken names for assignments ("STEM Fluency 3", not "STEM Fluency Assignment 3")
 
 **Alexa+ integration**
 
 - [x] **MCP server** (spec 2025-11-25, Streamable HTTP) exposing the planner as tools Alexa+ can call
 - [x] **Agent Skill** (open `SKILL.md` standard): teaches the agent how to prioritize and how to answer briefly for voice
-- [ ] **Simulated Alexa+ web app**: speak a question, an agent calls the MCP server, and the answer is spoken back (built and tested; waiting on Bedrock access for a live run)
+- [x] **Simulated Alexa+ web app**: speak a question, an agent calls the MCP server, and the answer is spoken back
 
 **AWS**
 
-- [ ] **Amazon Bedrock**: the AI model behind the simulated Alexa+ agent, and estimates of how long each assignment will take
-- [ ] **Strands Agents SDK**: connects the Bedrock agent to the MCP server
+- [x] **Amazon Bedrock**: the AI model (Amazon Nova 2 Lite) behind the simulated Alexa+ agent, and short spoken names for assignments
+- [x] **Strands Agents SDK**: connects the Bedrock agent to the MCP server
 - [x] **AWS Lambda**: hosts the MCP server in the cloud, behind a Function URL with an API key
 - [x] **Amazon EventBridge Scheduler**: checks Canvas every morning and evening to trigger reminders
 - [x] **Amazon DynamoDB**: stores which reminders were sent and which are waiting to be heard
@@ -87,7 +89,10 @@ Ask what to work on with 2 hours free:
 python -m homework_helper.planner 120
 ```
 
-Plan your week (optionally pass minutes per day, default 120):
+Plan your week (optionally pass minutes per day, default 120). Quizzes and
+tests get study time first, the day before when there's room (exams get two
+sessions), and work longer than an hour is split into sessions on separate
+days:
 
 ```
 python -m homework_helper.week
@@ -127,10 +132,20 @@ returns `say`, a short answer ready to be spoken, plus the details behind it:
 | Tool | What it does |
 |---|---|
 | `what_should_i_work_on` | Best work to do now; pass `minutes_free` to fill that time |
-| `plan_my_week` | Spreads homework across the next 7 days |
+| `plan_my_week` | A timed study schedule for the next 7 days, around your calendar |
 | `list_assignments` | All unfinished work, most important first |
 | `check_reminders` | Work due within a day, within 3 hours, or overdue |
 | `add_study_sessions` | Puts the week plan on Google Calendar |
+| `mark_complete` | Ticks "mark as done" in Canvas for what the student says they finished |
+
+Canvas titles are written to be read, not heard, so the server asks Amazon
+Bedrock once per title for the short name a student would say ("free fall
+acceleration pre-lab" for "Pre-lab for Acceleration of a Freely Falling
+Object") and keeps it (in DynamoDB in the cloud, `spoken_names.json`
+locally). If Bedrock can't be reached, simple rules shorten the title.
+`mark_complete` uses the Canvas planner's "mark as done" checkbox; it never
+submits anything to the teacher. If what the student said matches more
+than one assignment, it asks which one.
 
 To try it in a browser, run `npx @modelcontextprotocol/inspector`, choose
 **Streamable HTTP**, and connect to `http://127.0.0.1:8000/mcp`.
@@ -159,7 +174,10 @@ ask a question out loud, and hear the answer. Behind it, an agent built with
 the **Strands Agents SDK** on **Amazon Bedrock** (Amazon Nova 2 Lite) follows
 the Agent Skill and answers by calling the MCP server over Streamable HTTP.
 New reminders turn the ring yellow, like an Alexa notification; ask "what
-are my notifications?" to hear them.
+are my notifications?" to hear them. Like an Echo Show, detailed answers
+also appear on screen: "plan my week" shows the whole schedule with times,
+and assignment lists show as cards linking to Canvas. It follows your
+system's light or dark theme and works on a phone.
 
 Sign in to AWS first (`aws login`), then:
 
@@ -181,8 +199,10 @@ in `.env` to use a different model.
   `Authorization: Bearer <MCP_API_KEY>`.
 - **Amazon EventBridge Scheduler** running a reminder check at 7 AM and 7 PM
   in the student's time zone.
-- **Amazon DynamoDB** remembering which reminders were sent, and queuing new
-  ones until they're heard (old records expire on their own).
+- **Amazon DynamoDB** remembering which reminders were sent, queuing new
+  ones until they're heard (old records expire on their own), and keeping
+  the spoken names Bedrock made for each assignment.
+- **Amazon Bedrock** access for both functions, to name new assignments.
 
 You only need the AWS CLI and [uv](https://docs.astral.sh/uv/) (`pip install uv`),
 not the SAM CLI. Sign in (`aws login`), then:

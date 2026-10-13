@@ -148,3 +148,44 @@ def test_overdue_uses_due_date_not_just_canvas_flag():
     by_id = {a.id: a for a in canvas.assignments()}
     assert by_id[1].overdue
     assert not by_id[2].overdue and not by_id[3].overdue
+
+
+def canvas_recording_writes(reply):
+    canvas = Canvas(BASE, "token")
+    sent = []
+
+    def fake_request(method, url, json=None, timeout=None):
+        sent.append((method, url, json))
+        return FakeResponse(reply)
+
+    canvas.session.request = fake_request
+    return canvas, sent
+
+
+def test_mark_done_creates_a_planner_override():
+    canvas, _ = canvas_with([FakeResponse([planner_item(plannable_type="quiz", plannable_id=7)])])
+    [a] = canvas.assignments()
+    canvas, sent = canvas_recording_writes({"id": 55})
+    canvas.mark_done(a)
+    assert sent == [("POST", BASE + "/api/v1/planner/overrides",
+                     {"plannable_type": "quiz", "plannable_id": 7, "marked_complete": True})]
+    assert a.done and a.override_id == 55
+
+
+def test_mark_done_updates_an_existing_override():
+    canvas, _ = canvas_with([FakeResponse([planner_item(
+        planner_override={"id": 55, "marked_complete": True})])])
+    [a] = canvas.assignments()
+    assert a.done and a.override_id == 55
+    canvas, sent = canvas_recording_writes({"id": 55})
+    canvas.mark_done(a, done=False)
+    assert sent == [("PUT", BASE + "/api/v1/planner/overrides/55", {"marked_complete": False})]
+    assert not a.done
+
+
+def test_mark_done_reports_canvas_errors():
+    canvas, _ = canvas_with([FakeResponse([planner_item()])])
+    [a] = canvas.assignments()
+    canvas.session.request = lambda *args, **kw: FakeResponse({}, status=403)
+    with pytest.raises(CanvasError, match="403"):
+        canvas.mark_done(a)
