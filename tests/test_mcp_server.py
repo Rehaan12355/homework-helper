@@ -75,7 +75,7 @@ def test_what_fits_in_an_hour():
 
 def test_plan_my_week():
     result = call("plan_my_week")
-    assert result["say"] == ("Start today at 4 PM with Quiz 2. Today: Study for Quiz 2, "
+    assert result["say"] == ("Start today at 4 PM with studying for Quiz 2. Today: Study for Quiz 2, "
                              "Quiz 2 and Chapter 3 homework. After that, 3 more sessions "
                              "through Tuesday. Some days run over your usual study time.")
     assert result["whole_week"].startswith("Today: Study for Quiz 2")
@@ -140,3 +140,48 @@ def test_mark_complete_not_found(monkeypatch):
     monkeypatch.setattr(mcp_server, "canvas", lambda: pytest.fail("shouldn't change Canvas"))
     result = call("mark_complete", {"assignment": "history essay"})
     assert result["say"] == "I couldn't find an assignment called history essay."
+
+
+def sessions_on(result, day=0):
+    return [(s["start"][11:16], s["end"][11:16], s["label"]) for s in result["days"][day]["sessions"]]
+
+
+def test_plan_works_around_a_busy_time():
+    before = sessions_on(call("plan_my_week"))
+    assert any(start < "17:00" < end for start, end, _ in before)    # something runs 4–5 PM
+    result = call("plan_my_week", {"busy": [{"label": "Gym", "start": "16:00", "end": "17:00"}]})
+    assert result["say"].startswith("Got it: Gym from 4 to 5 PM today. Here's the new plan. "
+                                    "Start today at 5 PM with")
+    assert all(start >= "17:00" for start, _, _ in sessions_on(result))
+    assert result["days"][0]["busy"] == [{"label": "Gym", "start": "2026-10-10T16:00:00-07:00",
+                                          "end": "2026-10-10T17:00:00-07:00"}]
+
+
+def test_plan_changes_are_remembered_until_removed():
+    call("plan_my_week", {"busy": [{"label": "Gym", "start": "16:00", "end": "17:00",
+                                    "days": "every day"}], "bedtime": "21:00"})
+    again = call("plan_my_week")
+    assert not again["say"].startswith("Got it")
+    assert all(s >= "17:00" and e <= "21:00" for d in range(7)
+               for s, e, _ in sessions_on(again, d))
+    assert again["study_hours"] == {"start": "4 PM", "bedtime": "9 PM"}
+    removed = call("plan_my_week", {"remove": ["gym"]})
+    assert removed["say"].startswith("Got it: I took out gym.")
+    assert removed["days"][1]["busy"] == []
+
+
+def test_plan_explains_changes_it_cannot_understand():
+    result = call("plan_my_week", {"bedtime": "after the movie"})
+    assert result["say"] == "I didn't understand the time after the movie. Could you say it another way?"
+
+
+def test_calendar_sessions_use_the_same_changes(monkeypatch):
+    from homework_helper import study_sessions
+    from tests.test_study_sessions import FakeCalendar
+    calendar = FakeCalendar([])
+    monkeypatch.setattr(study_sessions, "google_calendar", lambda: calendar)
+    call("plan_my_week", {"busy": [{"label": "Gym", "start": "16:00", "end": "17:00"}]})
+    call("add_study_sessions")
+    today = [e for e in calendar.events_by_id.values()
+             if e["start"]["dateTime"].startswith("2026-10-10")]
+    assert today and all(e["start"]["dateTime"][11:16] >= "17:00" for e in today)

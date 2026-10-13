@@ -195,6 +195,7 @@
   .pill.bad { background: var(--bad-soft); color: var(--bad); }
   .pill.study { background: var(--study-soft); color: var(--study); }
   .pill.do { background: var(--accent-soft); color: var(--accent-text); }
+  .pill.mine { background: var(--surface-2); color: var(--muted); }
   .free { color: var(--faint); font-size: 12.5px; }
   .empty-day { padding-top: 9px; padding-bottom: 9px; }
   .empty-day .day-head { margin-bottom: 0; }
@@ -207,6 +208,8 @@
   .bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--accent); }
   .bar.study { background: var(--study); }
   .bar.late { background: var(--bad); }
+  .bar.mine { background: var(--faint); opacity: .5; }
+  .session.busy .name { color: var(--muted); font-weight: 500; }
   .what { min-width: 0; }
   .what .name { font-weight: 550; font-size: 14px; }
   .what .sub { color: var(--faint); font-size: 12px; }
@@ -295,6 +298,7 @@
       <button class="chip">What's due today?</button>
       <button class="chip">I have an hour free</button>
       <button class="chip">Anything due soon?</button>
+      <button class="chip">I go to bed at 10</button>
     </div>
   </aside>
 
@@ -407,7 +411,8 @@ function renderSchedule(card) {
   const box = el("div", "card");
   const head = el("div", "card-head");
   head.appendChild(el("h4", "", "Your week"));
-  head.appendChild(el("span", "", card.fits_your_calendar ? "Fitted around your calendar" : "Study time starts after school"));
+  const hours = card.study_hours ? ` · ${card.study_hours.start} – ${card.study_hours.bedtime}` : "";
+  head.appendChild(el("span", "", (card.fits_your_calendar ? "Fitted around your calendar" : "Study plan") + hours));
   box.appendChild(head);
 
   for (const day of card.days || []) {
@@ -416,9 +421,25 @@ function renderSchedule(card) {
     dh.appendChild(el("span", "day-name", day.day));
     dh.appendChild(el("span", "day-date", fmtDay(day.date)));
     if (day.over_budget) dh.appendChild(el("span", "pill warn", "Busy day"));
-    if (!day.sessions.length) { dh.appendChild(el("span", "free", "· Free day")); sec.classList.add("empty-day"); }
+    const busy = day.busy || [];
+    if (!day.sessions.length && !busy.length) { dh.appendChild(el("span", "free", "· Free day")); sec.classList.add("empty-day"); }
     sec.appendChild(dh);
-    for (const s of day.sessions) {
+    // The student's own busy times, in order with the study sessions.
+    const rows = [...day.sessions, ...busy.map(b => ({ ...b, busy: true }))]
+      .sort((a, b) => new Date(a.start) - new Date(b.start));
+    for (const s of rows) {
+      if (s.busy) {
+        const row = el("div", "session busy");
+        row.appendChild(el("span", "time", `${fmtTime(s.start)} – ${fmtTime(s.end)}`));
+        row.appendChild(el("span", "bar mine"));
+        const what = el("div", "what");
+        what.appendChild(el("div", "name", s.label));
+        what.appendChild(el("div", "sub", "Your time"));
+        row.appendChild(what);
+        row.appendChild(el("span"));
+        sec.appendChild(row);
+        continue;
+      }
       const row = el("div", "session");
       row.appendChild(el("span", "time", `${fmtTime(s.start)} – ${fmtTime(s.end)}`));
       row.appendChild(el("span", "bar " + (s.task === "study" ? "study" : s.overdue ? "late" : "")));
@@ -436,7 +457,8 @@ function renderSchedule(card) {
     box.appendChild(el("div", "unfit", "No free time found for: " + card.no_time_for.join(", ")));
   }
   const legend = el("div", "legend");
-  legend.append(el("span", "pill study", "Study"), el("span", "pill do", "Assignment"), el("span", "pill bad", "Overdue"));
+  legend.append(el("span", "pill study", "Study"), el("span", "pill do", "Assignment"),
+                el("span", "pill bad", "Overdue"), el("span", "pill mine", "Your time"));
   box.appendChild(legend);
   return box;
 }

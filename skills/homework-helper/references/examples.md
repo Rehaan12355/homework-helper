@@ -61,6 +61,24 @@ These show the voice and length to aim for. Tool results are summarized.
 >
 > **Alexa:** Done, I added nine study sessions. The first is Quiz 2 at 4.
 
+## Changing the plan
+
+> **Student:** Can you squeeze in my gym time from 7 to 8?
+>
+> *(calls `plan_my_week` with `busy: [{label: "Gym", start: "19:00",
+> end: "20:00", days: "today"}]`)*
+>
+> **Alexa:** Got it, I planned around the gym from 7 to 8. Start at 4 with
+> the Motion Lab write-up. The rest is on screen.
+>
+> **Student:** And I go to bed at 10.
+>
+> *(calls `plan_my_week` with `bedtime: "22:00"`; the gym is already
+> remembered)*
+>
+> **Alexa:** Okay, everything's done by 10 now. The free fall pre-lab moved
+> to tomorrow.
+
 ## Student says it's done
 
 > **Student:** I already did Quiz 2.

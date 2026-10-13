@@ -121,3 +121,11 @@ def test_alexa_app_reads_the_cloud_inbox(monkeypatch):
         assert client.post("/api/notifications").json() == {
             "notifications": ["Heads up: HW 1 is due soon."]}
         assert client.get("/api/notifications").json() == {"count": 0}
+
+
+def test_plan_settings_round_trip_in_dynamodb():
+    table = FakeTable()
+    saved = store.DynamoSettings(table)
+    assert saved.load() == {}
+    saved.save({"bedtime": "22:00", "busy": []})
+    assert saved.load() == {"bedtime": "22:00", "busy": []}

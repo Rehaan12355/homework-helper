@@ -54,12 +54,44 @@ def study_start() -> time:
     return time(int(hours), int(minutes))
 
 
-def last_work_day(a: Assignment) -> date:
+@dataclass
+class Hours:
+    """When the student can study: from `start` until `bedtime` each day,
+    except `busy` times (calendar events, the gym, dinner)."""
+    start: time = field(default_factory=study_start)
+    bedtime: time = BEDTIME
+    busy: list[tuple[datetime, datetime]] = field(default_factory=list)
+
+    def window(self, day: date, tz) -> tuple[datetime, datetime]:
+        opens = datetime.combine(day, self.start, tz)
+        closes = datetime.combine(day, self.bedtime, tz)
+        if closes <= opens:                  # bedtime after midnight
+            closes += timedelta(days=1)
+        return opens, closes
+
+    def free_minutes(self, day: date, now: datetime) -> int:
+        """Minutes free for studying that day, from now on."""
+        local_now = to_local(now)
+        opens, closes = self.window(day, local_now.tzinfo)
+        opens = max(opens, local_now)
+        if closes <= opens:
+            return 0
+        taken, last = 0, opens
+        for b_start, b_end in sorted(self.busy):
+            b_start, b_end = max(b_start, last), min(b_end, closes)
+            if b_end > b_start:
+                taken += (b_end - b_start).total_seconds()
+                last = b_end
+        return max(0, int(((closes - opens).total_seconds() - taken) // 60))
+
+
+def last_work_day(a: Assignment, start: time | None = None) -> date:
     """The last day this can realistically be worked on: work due before
     study time starts (a 10:30 AM lab, a 12:30 PM class) has to be done the
     day before."""
     due = to_local(a.due)
-    return due.date() - timedelta(days=1) if due.time() <= study_start() else due.date()
+    cutoff = start or study_start()
+    return due.date() - timedelta(days=1) if due.time() <= cutoff else due.date()
 
 
 def sessions_for(pick: Pick) -> list[Pick]:
@@ -82,25 +114,28 @@ def sessions_for(pick: Pick) -> list[Pick]:
 
 
 def plan_week(work: list[Assignment], now: datetime | None = None,
-              days: int = 7, daily_minutes: int = DAILY_MINUTES) -> list[Day]:
+              days: int = 7, daily_minutes: int = DAILY_MINUTES,
+              hours: Hours | None = None) -> list[Day]:
+    """Each day's budget is the daily study time, or less if that's all the
+    free time left (after bedtime moves earlier, or the gym, or events)."""
     now = now or datetime.now(timezone.utc)
-    local_now = to_local(now)
-    today = local_now.date()
-
-    bedtime = datetime.combine(today, BEDTIME, local_now.tzinfo)
-    minutes_left_today = max(0, int((bedtime - local_now).total_seconds() // 60))
-    week = [Day(today, min(daily_minutes, minutes_left_today))]
-    week += [Day(today + timedelta(days=i), daily_minutes) for i in range(1, days)]
+    hours = hours or Hours()
+    today = to_local(now).date()
+    week = [Day(d, min(daily_minutes, hours.free_minutes(d, now)))
+            for d in (today + timedelta(days=i) for i in range(days))]
     last_day = week[-1].date
+
+    def deadline_of(a: Assignment) -> date:
+        return last_work_day(a, hours.start)
 
     # Skip work that's too stale to count and work due after this week.
     todo = [p for p in ranked(work, now)
-            if not is_stale(p.assignment, now) and last_work_day(p.assignment) <= last_day]
+            if not is_stale(p.assignment, now) and deadline_of(p.assignment) <= last_day]
     # Place the tightest deadlines first so they get first pick of days.
-    todo.sort(key=lambda p: (last_work_day(p.assignment), -p.score))
+    todo.sort(key=lambda p: (deadline_of(p.assignment), -p.score))
 
     for pick in todo:
-        deadline = max(last_work_day(pick.assignment), today)   # overdue → today
+        deadline = max(deadline_of(pick.assignment), today)     # overdue → today
         earliest = today
         for session in sessions_for(pick):
             options = [d for d in week if earliest <= d.date <= deadline]

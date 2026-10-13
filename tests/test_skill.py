@@ -19,7 +19,8 @@ def test_skill_only_names_tools_the_server_has():
     named = set(re.findall(r"`([a-z_]+)`", (SKILL_DIR / "SKILL.md").read_text()))
     tools = asyncio.run(server_tools())
     params = {"minutes_free", "minutes_per_day", "say", "name", "title",
-              "assignment", "done", "minutes", "whole_week"}
+              "assignment", "done", "minutes", "whole_week", "busy", "label", "start",
+              "end", "days", "bedtime", "start_time", "remove"}
     assert named - params <= tools
     assert tools <= named, "every tool should be explained in the skill"
 

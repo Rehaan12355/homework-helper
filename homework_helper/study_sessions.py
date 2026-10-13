@@ -13,7 +13,7 @@ from datetime import datetime, time, timedelta, timezone
 
 from homework_helper.clock import local_tz, to_local
 from homework_helper.planner import Pick
-from homework_helper.week import BEDTIME, Day, study_start
+from homework_helper.week import Day, Hours
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 TAG = "homeworkHelper"                 # marks events this app created
@@ -79,16 +79,18 @@ def first_free(start: datetime, length: timedelta, close: datetime,
 
 
 def schedule(week: list[Day], busy: list[tuple[datetime, datetime]],
-             now: datetime | None = None) -> tuple[list[Session], list[Pick]]:
+             now: datetime | None = None,
+             hours: Hours | None = None) -> tuple[list[Session], list[Pick]]:
     """Places each day's work into free time. Returns the sessions, and the
     work that didn't fit anywhere that day."""
     now = now or datetime.now(timezone.utc)
+    hours = hours or Hours()
+    busy = sorted(busy + hours.busy)
     tz = to_local(now).tzinfo
     sessions, unplaced = [], []
     for day in week:
-        cursor = datetime.combine(day.date, study_start(), tz)
+        cursor, close = hours.window(day.date, tz)
         cursor = max(cursor, to_local(now))
-        close = datetime.combine(day.date, BEDTIME, tz)
         for pick in day.picks:
             length = timedelta(minutes=pick.minutes)
             start = first_free(cursor, length, close, busy)
@@ -182,30 +184,30 @@ def list_events(service, start: datetime, end: datetime, calendar_id: str = "pri
             return events
 
 
-def preview(week: list[Day], now: datetime | None = None,
-            calendar_id: str = "primary") -> tuple[list[Session], list[Pick], bool]:
-    """Times for the week plan without changing anything. Fits around the
-    student's calendar when it can be read. Returns the sessions, the work
-    that didn't fit, and whether the calendar was used."""
-    now = now or datetime.now(timezone.utc)
-    end = datetime.combine(week[-1].date + timedelta(days=1), time(0), to_local(now).tzinfo)
-    busy, used = [], False
+def calendar_busy(now: datetime, days: int = 7,
+                  calendar_id: str = "primary") -> tuple[list[tuple[datetime, datetime]], bool]:
+    """When the student is busy over the next `days` days, from their Google
+    Calendar, without changing anything. Returns the busy times and whether
+    the calendar could be read (if not, plan as if it were empty)."""
+    end = datetime.combine(to_local(now).date() + timedelta(days=days), time(0),
+                           to_local(now).tzinfo)
     service = saved_calendar()
-    if service is not None:
-        try:
-            busy, used = busy_times(list_events(service, now, end, calendar_id), now), True
-        except Exception:
-            pass                    # plan without the calendar instead
-    return *schedule(week, busy, now), used
+    if service is None:
+        return [], False
+    try:
+        return busy_times(list_events(service, now, end, calendar_id), now), True
+    except Exception:
+        return [], False
 
 
 def sync(service, week: list[Day], now: datetime | None = None,
-         calendar_id: str = "primary") -> tuple[list[Session], list[Pick]]:
+         calendar_id: str = "primary",
+         hours: Hours | None = None) -> tuple[list[Session], list[Pick]]:
     """Replaces this app's upcoming study sessions with the current plan."""
     now = now or datetime.now(timezone.utc)
     end = datetime.combine(week[-1].date + timedelta(days=1), time(0), to_local(now).tzinfo)
     events = list_events(service, now, end, calendar_id)
-    sessions, unplaced = schedule(week, busy_times(events, now), now)
+    sessions, unplaced = schedule(week, busy_times(events, now), now, hours)
 
     for e in events:
         if is_ours(e) and parse_event_time(e["start"]["dateTime"]) >= now:

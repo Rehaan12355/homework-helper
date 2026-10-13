@@ -27,6 +27,7 @@ which also helps students with ADHD, dyslexia, or vision impairments.
 - [x] Read courses and assignments from Canvas, including what's submitted
 - [x] "What should I work on?": prioritize by due date, points, and time available
 - [x] "Plan my week": a timed study schedule with study time before quizzes and long work split across days
+- [x] Change the plan by voice: "squeeze in the gym from 7 to 8", "I go to bed at 10", "I get home at 5"
 - [x] Add study sessions to Google Calendar
 - [x] Proactive reminders for work due soon that isn't submitted
 - [x] "I finished Quiz 2": mark work done in Canvas by voice
@@ -132,7 +133,7 @@ returns `say`, a short answer ready to be spoken, plus the details behind it:
 | Tool | What it does |
 |---|---|
 | `what_should_i_work_on` | Best work to do now; pass `minutes_free` to fill that time |
-| `plan_my_week` | A timed study schedule for the next 7 days, around your calendar |
+| `plan_my_week` | A timed study schedule for the next 7 days, around your calendar; also takes changes (busy times, bedtime, start time) and remembers them |
 | `list_assignments` | All unfinished work, most important first |
 | `check_reminders` | Work due within a day, within 3 hours, or overdue |
 | `add_study_sessions` | Puts the week plan on Google Calendar |

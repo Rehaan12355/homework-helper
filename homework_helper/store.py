@@ -1,17 +1,20 @@
 """Cloud storage in Amazon DynamoDB, for when Homework Helper runs on AWS.
 
-One table holds two kinds of item, told apart by the partition key:
+One table holds four kinds of item, told apart by the partition key:
 
   pk="sent"          sk=<reminder key>   reminders already sent (replaces
                                          the local reminders_sent.json)
   pk="notification"  sk=<time>#<key>     reminders waiting to be heard, like
                                          unread Alexa notifications
   pk="name"          sk=<Canvas title>   short spoken name for that title
+  pk="settings"      sk="plan"           the student's changes to their plan
+                                         (busy times, bedtime), as JSON
 
 Sent reminders and notifications carry an `expires` time, so DynamoDB's TTL
-cleans up old records. Names are kept.
+cleans up old records. Names and settings are kept.
 """
 
+import json
 import os
 from datetime import datetime
 
@@ -55,6 +58,20 @@ class DynamoNames:
         with self.table.batch_writer() as batch:
             for title, name in new.items():
                 batch.put_item(Item={"pk": "name", "sk": title, "name": name})
+
+
+class DynamoSettings:
+    """Same job as plan_settings.FileSettings, kept in DynamoDB."""
+
+    def __init__(self, tbl):
+        self.table = tbl
+
+    def load(self) -> dict:
+        item = self.table.get_item(Key={"pk": "settings", "sk": "plan"}).get("Item")
+        return json.loads(item["data"]) if item else {}
+
+    def save(self, data: dict) -> None:
+        self.table.put_item(Item={"pk": "settings", "sk": "plan", "data": json.dumps(data)})
 
 
 def _query(tbl, pk: str) -> list[dict]:

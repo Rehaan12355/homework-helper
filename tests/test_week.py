@@ -131,3 +131,29 @@ def test_parts_on_the_same_day_are_said_once():
     week = plan_week([work("Motion Lab write-up", local(10, 10, 30))], NOW)
     assert len(week[0].picks) == 2
     assert spoken_summary(week) == "Today: Motion Lab write-up."
+
+
+def test_free_time_leaves_out_busy_times_and_bedtime():
+    from homework_helper.week import Hours
+    from datetime import time
+    hours = Hours(start=time(16), bedtime=time(22),
+                  busy=[(local(12, 19), local(12, 20)), (local(12, 19, 30), local(12, 20, 30))])
+    # 4 PM to 10 PM is 6 hours; the gym and an overlapping event take 1.5.
+    assert hours.free_minutes(date(2026, 10, 12), NOW) == 270
+    # Today it's already 2 PM, but study time hasn't started yet.
+    assert hours.free_minutes(date(2026, 10, 10), NOW) == 360
+
+
+def test_bedtime_after_midnight_counts_into_the_night():
+    from homework_helper.week import Hours
+    from datetime import time
+    assert Hours(start=time(16), bedtime=time(1)).free_minutes(date(2026, 10, 12), NOW) == 540
+
+
+def test_a_full_evening_shrinks_that_days_budget():
+    from homework_helper.week import Hours
+    from datetime import time
+    # Busy all Monday evening but 30 minutes: only short work goes there.
+    hours = Hours(start=time(16), bedtime=time(22), busy=[(local(12, 16, 30), local(12, 22))])
+    week = plan_week([], NOW, hours=hours)
+    assert next(d for d in week if d.date == date(2026, 10, 12)).budget == 30
